@@ -38,7 +38,7 @@ export function projectNav(projectId: number): NavItem[] {
 export function organizationNav(): NavItem[] {
   return [
     { key: "roles", label: "Roles & permissions", feature: "roles", href: "/settings/roles", built: true },
-    { key: "members", label: "Members", feature: "members", built: false },
+    { key: "members", label: "Members", feature: "members", href: "/settings/members", built: true },
     { key: "billing", label: "Billing", feature: "billing", built: false },
   ];
 }
