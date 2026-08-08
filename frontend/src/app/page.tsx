@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { MeHome } from "@/components/home/me-home";
 import { Benefits } from "@/components/landing/benefits";
@@ -23,12 +24,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * One address, two pages: the workspace root is your Me page once you are
- * signed in, and the marketing site to everyone else.
+ * One address, two pages: a workspace address is the Me page of whoever is
+ * signed in, and the root domain is the marketing site.
+ *
+ * A workspace address never shows marketing — someone arriving at
+ * acme.mentework.com came for their workspace, so they are sent to sign in.
  */
 export default async function Home() {
-  const session = (await getTenantSlug()) ? await getSession() : null;
-  if (session) {
+  if (await getTenantSlug()) {
+    const session = await getSession();
+    if (!session) {
+      redirect("/login");
+    }
     return (
       <WorkspaceFrame session={session}>
         <MeHome session={session} />
