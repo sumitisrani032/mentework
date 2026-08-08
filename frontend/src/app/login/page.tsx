@@ -59,7 +59,7 @@ export default async function LoginPage() {
 
   // Already signed in on this subdomain.
   if (await getSession()) {
-    redirect("/projects");
+    redirect("/");
   }
 
   return (
