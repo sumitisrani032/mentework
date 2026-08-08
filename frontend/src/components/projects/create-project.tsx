@@ -13,9 +13,9 @@ const FIELD_CLASS =
 
 const STATUSES = ["planning", "active", "on_hold", "completed", "archived"];
 
-export function CreateProject() {
+export function CreateProject({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
   const [description, setDescription] = useState("");
@@ -27,6 +27,11 @@ export function CreateProject() {
 
   function close() {
     setOpen(false);
+    // Drop the ?new=1 the rail's + button adds, so pressing it again reopens
+    // the form rather than navigating to a URL the page is already on.
+    if (defaultOpen) {
+      router.replace("/projects");
+    }
     setName("");
     setKey("");
     setDescription("");

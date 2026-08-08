@@ -37,7 +37,7 @@ export function LoginForm() {
       }
 
       // Refresh so server components pick up the new session cookie.
-      router.replace("/dashboard");
+      router.replace("/projects");
       router.refresh();
     } catch {
       setError("Could not reach the server.");

@@ -2,10 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Logo } from "@/components/logo";
 import { CreateProject } from "@/components/projects/create-project";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Container } from "@/components/ui/section";
 import { getSession } from "@/lib/session";
 import { fetchProjects } from "@/lib/timesheets-server";
@@ -23,12 +21,18 @@ const STATUS_TONE: Record<string, string> = {
   archived: "text-muted",
 };
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
   const session = await getSession();
   if (!session) {
     redirect("/login");
   }
 
+  // The rail's + button lands here with the form already open.
+  const { new: newProject } = await searchParams;
   const projects = await fetchProjects();
   const canCreate = session.permissions.some(
     (grant) => grant.feature === "projects" && grant.can_create,
@@ -37,19 +41,11 @@ export default async function ProjectsPage() {
   return (
     <>
       <header className="border-b border-border">
-        <Container className="flex h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard">
-              <Logo />
-            </Link>
-            <span className="hidden text-sm text-muted sm:inline">
-              {session.organization.name}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <SignOutButton />
-          </div>
+        <Container className="flex h-16 items-center gap-3">
+          <Link href="/dashboard">
+            <Logo />
+          </Link>
+          <span className="hidden text-sm text-muted sm:inline">{session.organization.name}</span>
         </Container>
       </header>
 
@@ -64,7 +60,11 @@ export default async function ProjectsPage() {
                   : "Everything you have access to."}
               </p>
             </div>
-            {canCreate ? <CreateProject /> : null}
+            {canCreate ? (
+              // Keyed on the flag so arriving from the rail's + button remounts
+              // the form open, even when the page itself is already rendered.
+              <CreateProject key={newProject === "1" ? "new" : "list"} defaultOpen={newProject === "1"} />
+            ) : null}
           </div>
 
           {projects.length === 0 ? (

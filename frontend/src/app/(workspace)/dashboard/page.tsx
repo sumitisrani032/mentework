@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Container } from "@/components/ui/section";
 import { ACTIONS, ACTION_LABELS } from "@/lib/rbac";
 import { getSession } from "@/lib/session";
@@ -25,17 +23,9 @@ export default async function DashboardPage() {
   return (
     <>
       <header className="border-b border-border">
-        <Container className="flex h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Logo />
-            <span className="hidden text-sm text-muted sm:inline">
-              {session.organization.name}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <SignOutButton />
-          </div>
+        <Container className="flex h-16 items-center gap-3">
+          <Logo />
+          <span className="hidden text-sm text-muted sm:inline">{session.organization.name}</span>
         </Container>
       </header>
 

@@ -1,10 +1,8 @@
 import Link from "next/link";
 
-import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Logo } from "@/components/logo";
 import { ProjectSwitcher } from "@/components/shell/project-switcher";
 import { TimeNav } from "@/components/shell/time-nav";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { isVisible, organizationNav, projectNav } from "@/lib/navigation";
 import type { Session } from "@/lib/session";
 import type { Project, ProjectPermissions, Timesheet } from "@/lib/timesheets";
@@ -98,13 +96,8 @@ export function AppShell({
           ) : null}
         </nav>
 
-        <div className="border-t border-border p-3">
-          <p className="px-2.5 text-sm font-medium">{session.user.full_name}</p>
-          <p className="px-2.5 text-xs text-muted">{session.organization.name}</p>
-          <div className="mt-3 flex items-center gap-2 px-0.5">
-            <ThemeToggle />
-            <SignOutButton />
-          </div>
+        <div className="border-t border-border px-5.5 py-3">
+          <p className="text-xs text-muted">{session.organization.name}</p>
         </div>
       </aside>
 

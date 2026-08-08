@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 
 import { PermissionMatrix } from "@/components/settings/permission-matrix";
 import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Container } from "@/components/ui/section";
 import { fetchRoleMatrix } from "@/lib/roles-server";
 import { getSession } from "@/lib/session";
@@ -36,14 +35,9 @@ export default async function RolesSettingsPage() {
   return (
     <>
       <header className="border-b border-border">
-        <Container className="flex h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Logo />
-            <span className="hidden text-sm text-muted sm:inline">
-              {session.organization.name}
-            </span>
-          </div>
-          <ThemeToggle />
+        <Container className="flex h-16 items-center gap-3">
+          <Logo />
+          <span className="hidden text-sm text-muted sm:inline">{session.organization.name}</span>
         </Container>
       </header>
 

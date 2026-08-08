@@ -1,0 +1,277 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
+
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
+
+type IconProps = { className?: string };
+
+const STROKE = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+} as const;
+
+function PlusIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE} strokeWidth={2.2}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function SearchIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <circle cx="11" cy="11" r="6" />
+      <path d="m20 20-4.3-4.3" />
+    </svg>
+  );
+}
+
+function HomeIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4v-5H9v5H5a1 1 0 0 1-1-1Z" />
+    </svg>
+  );
+}
+
+function FolderIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <path d="M3 7a1 1 0 0 1 1-1h5l2 2.5h8a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />
+    </svg>
+  );
+}
+
+function GlobeIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M4 12h16M12 4c2 2.4 3 5 3 8s-1 5.6-3 8c-2-2.4-3-5-3-8s1-5.6 3-8Z" />
+    </svg>
+  );
+}
+
+function ChatIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <path d="M4 5h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H8l-4 3Z" />
+      <path d="M18 9h2a1 1 0 0 1 1 1v6l-3-2.2h-5a1 1 0 0 1-1-1v-.3" />
+    </svg>
+  );
+}
+
+function SmileIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M9 10h.01M15 10h.01M9 14.5c.8.7 1.8 1 3 1s2.2-.3 3-1" />
+    </svg>
+  );
+}
+
+function HelpIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M9.6 9.4a2.5 2.5 0 0 1 4.9.6c0 1.7-2.5 2-2.5 3.5M12 17h.01" />
+    </svg>
+  );
+}
+
+type RailItem = {
+  key: string;
+  label: string;
+  icon: (props: IconProps) => React.ReactElement;
+  href?: string;
+  /** Sections that do not exist yet are shown dimmed rather than as dead links. */
+  built: boolean;
+  /** Path prefix that lights the item up. */
+  match?: string;
+};
+
+const ITEMS: RailItem[] = [
+  { key: "me", label: "Me", icon: HomeIcon, href: "/dashboard", built: true, match: "/dashboard" },
+  {
+    key: "projects",
+    label: "Projects",
+    icon: FolderIcon,
+    href: "/projects",
+    built: true,
+    match: "/projects",
+  },
+  { key: "everything", label: "Everything", icon: GlobeIcon, built: false },
+  { key: "chat", label: "Chat", icon: ChatIcon, built: false },
+];
+
+const BOTTOM_ITEMS: RailItem[] = [
+  { key: "feedback", label: "Feedback", icon: SmileIcon, built: false },
+  { key: "help", label: "Help", icon: HelpIcon, built: false },
+];
+
+function initialsOf(fullName: string): string {
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  const first = words[0][0];
+  const last = words.length > 1 ? words[words.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
+
+/**
+ * The workspace rail: the one piece of navigation present on every signed-in
+ * page, so Projects is always a click away wherever you are.
+ *
+ * Sections that are not built yet still appear, dimmed and inert, so the shape
+ * of the product is visible without pretending the links work.
+ */
+export function IconRail({
+  fullName,
+  organizationName,
+  canCreateProject,
+}: {
+  fullName: string;
+  organizationName: string;
+  canCreateProject: boolean;
+}) {
+  const pathname = usePathname();
+
+  return (
+    <aside className="sticky top-0 z-30 flex h-dvh w-16 shrink-0 flex-col items-center gap-1 border-r border-border bg-surface py-3">
+      {canCreateProject ? (
+        <Link
+          href="/projects?new=1"
+          title="New project"
+          aria-label="New project"
+          className="flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <PlusIcon className="size-5" />
+        </Link>
+      ) : null}
+
+      <RailButton label="Search" icon={SearchIcon} />
+
+      <hr className="my-2 w-8 border-t border-border" />
+
+      <nav aria-label="Workspace" className="flex flex-col items-center gap-1">
+        {ITEMS.map((item) => (
+          <RailEntry
+            key={item.key}
+            item={item}
+            active={item.match ? pathname.startsWith(item.match) : false}
+          />
+        ))}
+      </nav>
+
+      <div className="mt-auto flex flex-col items-center gap-1">
+        {BOTTOM_ITEMS.map((item) => (
+          <RailButton key={item.key} label={item.label} icon={item.icon} />
+        ))}
+
+        <AccountMenu fullName={fullName} organizationName={organizationName} />
+      </div>
+    </aside>
+  );
+}
+
+const ENTRY_CLASS = "flex w-14 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px]";
+
+function RailEntry({ item, active }: { item: RailItem; active: boolean }) {
+  const Icon = item.icon;
+
+  if (!item.built || !item.href) {
+    return <RailButton label={item.label} icon={item.icon} />;
+  }
+
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      className={`${ENTRY_CLASS} transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+        active
+          ? "font-medium text-primary"
+          : "text-muted hover:bg-surface-strong hover:text-foreground"
+      }`}
+    >
+      <span
+        className={`flex size-9 items-center justify-center rounded-xl transition-colors ${
+          active ? "bg-primary/15 ring-1 ring-primary/40" : ""
+        }`}
+      >
+        <Icon className="size-5" />
+      </span>
+      {item.label}
+    </Link>
+  );
+}
+
+/** A rail slot for something that is not built yet: visible, labelled, inert. */
+function RailButton({ label, icon: Icon }: { label: string; icon: (props: IconProps) => React.ReactElement }) {
+  return (
+    <span aria-disabled title={`${label} — not built yet`} className={`${ENTRY_CLASS} cursor-default text-muted/45`}>
+      <span className="flex size-9 items-center justify-center rounded-xl">
+        <Icon className="size-5" />
+      </span>
+      {label}
+    </span>
+  );
+}
+
+/**
+ * Who you are signed in as, with the controls that used to sit in each page
+ * header. The rail is on every page, so they only need to exist once.
+ */
+function AccountMenu({
+  fullName,
+  organizationName,
+}: {
+  fullName: string;
+  organizationName: string;
+}) {
+  const menu = useRef<HTMLDetailsElement>(null);
+
+  // A menu that only closes by clicking the avatar again feels stuck, so
+  // anywhere else and Escape close it too.
+  useEffect(() => {
+    function close(event: MouseEvent | KeyboardEvent) {
+      const element = menu.current;
+      if (!element?.open) return;
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+      if (event instanceof MouseEvent && element.contains(event.target as Node)) return;
+      element.open = false;
+    }
+
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, []);
+
+  return (
+    <details ref={menu} className="relative mt-1">
+      <summary
+        title={`${fullName} · ${organizationName}`}
+        className="flex size-9 cursor-pointer list-none items-center justify-center rounded-full bg-surface-strong text-xs font-semibold text-foreground ring-1 ring-border transition-colors hover:ring-primary/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        {initialsOf(fullName)}
+      </summary>
+
+      <div className="absolute bottom-0 left-full z-40 ml-2 w-56 rounded-xl border border-border bg-background p-4 shadow-lg">
+        <p className="text-sm font-medium">{fullName}</p>
+        <p className="mt-0.5 text-xs text-muted">{organizationName}</p>
+        <div className="mt-4 flex items-center gap-2">
+          <ThemeToggle />
+          <SignOutButton />
+        </div>
+      </div>
+    </details>
+  );
+}
