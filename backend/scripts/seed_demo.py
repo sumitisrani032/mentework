@@ -7,17 +7,21 @@ environment.
 
 import asyncio
 import sys
+from datetime import date
 
 from sqlalchemy import delete
 
 from app.core.config import get_settings
+from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.models.organization import Organization
-from app.models.project import Project
+from app.models.project import Project, ProjectStatus
 from app.models.user import User
 from app.services.rbac import assign_role, list_roles, seed_default_roles
 
 DEMO_SLUG = "acme"
+# Development only. The script refuses to run outside development.
+DEMO_PASSWORD = "mentework"
 
 PEOPLE = [
     ("ada@acme.test", "Ada Okonkwo", "organization-admin", None),
@@ -29,7 +33,24 @@ PEOPLE = [
     ("gita@acme.test", "Gita Bhatt", "viewer", "MOB"),
 ]
 
-PROJECTS = [("WEB", "Website Relaunch"), ("MOB", "Mobile App")]
+PROJECTS = [
+    {
+        "key": "WEB",
+        "name": "Website Relaunch",
+        "description": "Rebuild the marketing site and checkout flow.",
+        "status": ProjectStatus.ACTIVE,
+        "start_date": date(2026, 8, 1),
+        "end_date": date(2026, 12, 31),
+    },
+    {
+        "key": "MOB",
+        "name": "Mobile App",
+        "description": "Native companion app for iOS and Android.",
+        "status": ProjectStatus.PLANNING,
+        "start_date": date(2026, 10, 1),
+        "end_date": date(2027, 3, 31),
+    },
+]
 
 
 async def main() -> None:
@@ -47,20 +68,40 @@ async def main() -> None:
         await seed_default_roles(session, organization)
         roles = {role.slug: role for role in await list_roles(session, organization.id)}
 
-        projects = {}
-        for key, name in PROJECTS:
-            project = Project(organization_id=organization.id, key=key, name=name)
-            session.add(project)
-            projects[key] = project
+        # One hash reused across the demo accounts; argon2 is deliberately slow.
+        password_hash = hash_password(DEMO_PASSWORD)
+
+        users: dict[str, User] = {}
+        for email, full_name, _role_slug, _project_key in PEOPLE:
+            user = User(
+                organization_id=organization.id,
+                email=email,
+                full_name=full_name,
+                hashed_password=password_hash,
+            )
+            session.add(user)
+            users[email] = user
         await session.flush()
 
-        for email, full_name, role_slug, project_key in PEOPLE:
-            user = User(organization_id=organization.id, email=email, full_name=full_name)
-            session.add(user)
-            await session.flush()
+        admin = users[PEOPLE[0][0]]
+        manager = users[PEOPLE[1][0]]
+
+        projects: dict[str, Project] = {}
+        for spec in PROJECTS:
+            project = Project(
+                organization_id=organization.id,
+                owner_id=manager.id,
+                created_by=admin.id,
+                **spec,
+            )
+            session.add(project)
+            projects[spec["key"]] = project
+        await session.flush()
+
+        for email, _full_name, role_slug, project_key in PEOPLE:
             await assign_role(
                 session,
-                user_id=user.id,
+                user_id=users[email].id,
                 role=roles[role_slug],
                 project_id=projects[project_key].id if project_key else None,
             )
@@ -72,6 +113,10 @@ async def main() -> None:
         print(f"  roles:    {len(roles)}")
         print(f"  projects: {len(projects)}")
         print(f"  users:    {len(PEOPLE)}")
+        print()
+        print(f"  Sign in at /login on the {DEMO_SLUG!r} workspace with:")
+        for email, _full_name, role_slug, _project_key in PEOPLE:
+            print(f"    {email:22} {DEMO_PASSWORD:12} ({role_slug})")
 
 
 if __name__ == "__main__":
