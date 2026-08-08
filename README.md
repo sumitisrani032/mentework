@@ -30,10 +30,10 @@ apps/
 
 ```bash
 cp .env.example .env                  # database + API settings
-cp apps/web/.env.example apps/web/.env.local   # web settings
+cp frontend/.env.example frontend/.env.local   # web settings
 
 npm install       # JavaScript dependencies
-npm run setup:api # create apps/api/.venv and install Python dependencies
+npm run setup:api # create backend/.venv and install Python dependencies
 npm run db:up     # start PostgreSQL
 npm run dev       # run web and api together
 ```
@@ -66,12 +66,12 @@ not collide with a PostgreSQL installed on the host. Change `POSTGRES_PORT` and
 
 `.env` at the repository root configures Docker Compose and the API. Next.js
 only reads env files from its own directory, so web settings live in
-`apps/web/.env.local`. Both have a committed `.env.example` to copy from;
+`frontend/.env.local`. Both have a committed `.env.example` to copy from;
 neither `.env` file is committed.
 
 ## Migrations
 
-Models live in `apps/api/app/models/`. Import each new model module in
+Models live in `backend/app/models/`. Import each new model module in
 `app/models/__init__.py` so Alembic autogenerate sees it, then:
 
 ```bash

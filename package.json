@@ -2,28 +2,28 @@
   "name": "mentework",
   "version": "0.1.0",
   "private": true,
-  "description": "Mentework monorepo: Next.js web frontend and FastAPI backend",
+  "description": "Mentework monorepo: Next.js frontend and FastAPI backend",
   "workspaces": [
-    "apps/web"
+    "frontend"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "dev": "concurrently -n web,api -c cyan,magenta \"npm:dev:web\" \"npm:dev:api\"",
-    "dev:web": "npm run dev --workspace apps/web",
-    "dev:api": "apps/api/.venv/bin/uvicorn app.main:app --reload --port 8000 --app-dir apps/api",
-    "build": "npm run build --workspace apps/web",
+    "dev:web": "npm run dev --workspace frontend",
+    "dev:api": "backend/.venv/bin/uvicorn app.main:app --reload --port 8000 --app-dir backend",
+    "build": "npm run build --workspace frontend",
     "lint": "npm run lint:web && npm run lint:api",
-    "lint:web": "npm run lint --workspace apps/web",
-    "lint:api": "cd apps/api && .venv/bin/ruff check . && .venv/bin/ruff format --check .",
+    "lint:web": "npm run lint --workspace frontend",
+    "lint:api": "cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check .",
     "test": "npm run test:api",
-    "test:api": "cd apps/api && .venv/bin/pytest",
-    "setup:api": "cd apps/api && uv venv .venv --python 3.12 && uv pip install --python .venv/bin/python -e \".[dev]\"",
+    "test:api": "cd backend && .venv/bin/pytest",
+    "setup:api": "cd backend && uv venv .venv --python 3.12 && uv pip install --python .venv/bin/python -e \".[dev]\"",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:migrate": "cd apps/api && .venv/bin/alembic upgrade head",
-    "db:revision": "cd apps/api && .venv/bin/alembic revision --autogenerate -m"
+    "db:migrate": "cd backend && .venv/bin/alembic upgrade head",
+    "db:revision": "cd backend && .venv/bin/alembic revision --autogenerate -m"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
