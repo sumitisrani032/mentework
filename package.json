@@ -1,0 +1,24 @@
+{
+  "name": "mentework",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mentework monorepo: Next.js web frontend and FastAPI backend",
+  "workspaces": [
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "npm run dev --workspace apps/web",
+    "dev:api": "apps/api/.venv/bin/uvicorn app.main:app --reload --port 8000 --app-dir apps/api",
+    "build": "npm run build --workspace apps/web",
+    "lint": "npm run lint --workspace apps/web",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
