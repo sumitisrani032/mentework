@@ -53,6 +53,29 @@ body {
   color: var(--foreground);
 }
 
+/*
+ * Anything you can click says so.
+ *
+ * Tailwind's preflight resets buttons to the default arrow, which leaves every
+ * button, dropdown summary and file-drop label in the app feeling inert. Links
+ * already point on their own; these are the elements that need it back.
+ * Disabled controls are excluded — they are not clickable.
+ */
+@layer base {
+  button:not(:disabled),
+  summary,
+  label[for],
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 /* Theme changes should be instant, but in-page transitions should not be. */
 @media (prefers-reduced-motion: no-preference) {
   html {
