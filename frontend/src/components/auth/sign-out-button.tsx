@@ -5,7 +5,21 @@ import { useState } from "react";
 
 import { buttonClass } from "@/components/ui/button";
 
-export function SignOutButton() {
+/**
+ * Ends the session.
+ *
+ * `className` and `icon` exist so the account menu can show it as a menu row
+ * without a second copy of the sign-out logic.
+ */
+export function SignOutButton({
+  className,
+  icon,
+  label = "Sign out",
+}: {
+  className?: string;
+  icon?: React.ReactNode;
+  label?: string;
+} = {}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -21,9 +35,10 @@ export function SignOutButton() {
       type="button"
       onClick={signOut}
       disabled={pending}
-      className={buttonClass("secondary", "sm")}
+      className={className ?? buttonClass("secondary", "sm")}
     >
-      {pending ? "Signing out…" : "Sign out"}
+      {icon}
+      {pending ? "Signing out…" : label}
     </button>
   );
 }

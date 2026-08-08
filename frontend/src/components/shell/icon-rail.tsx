@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeModes } from "@/components/theme-modes";
 
 type IconProps = { className?: string };
 
@@ -82,6 +82,32 @@ function HelpIcon({ className }: IconProps) {
     <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M9.6 9.4a2.5 2.5 0 0 1 4.9.6c0 1.7-2.5 2-2.5 3.5M12 17h.01" />
+    </svg>
+  );
+}
+
+function ProfileIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <circle cx="10" cy="8.5" r="3.5" />
+      <path d="M3.5 20a6.5 6.5 0 0 1 11-4.7M17 17.5l3.5-3.5-1.5-1.5L15.5 16v1.5Z" />
+    </svg>
+  );
+}
+
+function KeyIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <circle cx="8" cy="12" r="4" />
+      <path d="M12 12h9M18 12v3M15.5 12v2.5" />
+    </svg>
+  );
+}
+
+function PowerIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <path d="M12 3.5v7.5M7.5 6.5a7 7 0 1 0 9 0" />
     </svg>
   );
 }
@@ -233,6 +259,10 @@ function AccountMenu({
 }) {
   const menu = useRef<HTMLDetailsElement>(null);
 
+  function closeMenu() {
+    if (menu.current) menu.current.open = false;
+  }
+
   // A menu that only closes by clicking the avatar again feels stuck, so
   // anywhere else and Escape close it too.
   useEffect(() => {
@@ -261,14 +291,73 @@ function AccountMenu({
         {initialsOf(fullName)}
       </summary>
 
-      <div className="absolute bottom-0 left-full z-40 ml-2 w-56 rounded-xl border border-border bg-background p-4 shadow-lg">
-        <p className="text-sm font-medium">{fullName}</p>
-        <p className="mt-0.5 text-xs text-muted">{organizationName}</p>
-        <div className="mt-4 flex items-center gap-2">
-          <ThemeToggle />
-          <SignOutButton />
+      <div className="absolute bottom-0 left-full z-40 ml-2 w-64 rounded-xl border border-border bg-background p-1.5 shadow-xl">
+        <div className="flex items-center gap-3 px-2.5 py-2.5">
+          <span
+            aria-hidden
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-strong text-xs font-semibold ring-1 ring-border"
+          >
+            {initialsOf(fullName)}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium">{fullName}</span>
+            <span className="block truncate text-xs text-muted">{organizationName}</span>
+          </span>
         </div>
+
+        <Divider />
+
+        <MenuLink href="/settings/profile" icon={ProfileIcon} onNavigate={closeMenu}>
+          Profile
+        </MenuLink>
+        <MenuLink href="/settings/profile#change-password" icon={KeyIcon} onNavigate={closeMenu}>
+          Change password
+        </MenuLink>
+
+        <Divider />
+
+        <p className="px-2.5 pt-1.5 text-[11px] tracking-wide text-muted">Mode</p>
+        <ThemeModes />
+
+        <Divider />
+
+        <SignOutButton
+          className={`${MENU_ROW_CLASS} w-full text-muted hover:bg-surface-strong hover:text-foreground`}
+          icon={<PowerIcon className="size-4 shrink-0" />}
+          label="Log out"
+        />
       </div>
     </details>
+  );
+}
+
+const MENU_ROW_CLASS =
+  "flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+function Divider() {
+  return <hr className="my-1 border-t border-border" />;
+}
+
+function MenuLink({
+  href,
+  icon: Icon,
+  onNavigate,
+  children,
+}: {
+  href: string;
+  icon: (props: IconProps) => React.ReactElement;
+  onNavigate: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`${MENU_ROW_CLASS} text-muted hover:bg-surface-strong hover:text-foreground`}
+    >
+      <Icon className="size-4 shrink-0" />
+      {children}
+    </Link>
   );
 }

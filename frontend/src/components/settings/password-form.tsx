@@ -48,7 +48,11 @@ export function PasswordForm() {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border border-border bg-surface p-5">
+    <form
+      id="change-password"
+      onSubmit={submit}
+      className="scroll-mt-6 rounded-xl border border-border bg-surface p-5"
+    >
       <h2 className="font-medium">Change password</h2>
       <p className="mt-1 text-sm text-muted">
         You stay signed in here. Sessions on other devices keep running until they expire.
