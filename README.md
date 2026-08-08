@@ -191,6 +191,43 @@ Private timesheets are visible only to their creator, their assignees, and
 anyone whose role can *delete* timesheets — otherwise an administrator could
 not audit time they did not log themselves.
 
+### Bulk upload
+
+Anyone who can log time can upload a month at once as CSV. Four columns:
+
+```csv
+date,logged_hours,description,status
+2026-08-03,1:40,Brainstorm session,billable
+2026-08-04,2.5,Onboarding emails,none
+2026-08-05,0:30,Standup,billed
+```
+
+```
+GET  /api/v1/projects/{project_id}/timesheets/import-template
+POST /api/v1/projects/{project_id}/timesheets/{timesheet_id}/time/import
+       ?dry_run=true          validate without saving
+       ?allow_duplicates=true log rows that match time already recorded
+```
+
+Only `date` and `logged_hours` are required; `description` is optional and a
+blank `status` becomes `none`. Common header spellings (`Logged Hours`, `hours`,
+`notes`, `billing`) are accepted, the byte-order mark Excel writes is stripped,
+and blank lines are ignored.
+
+Four decisions that shape how it behaves:
+
+- **One bad row rejects the whole file.** You get every problem back at once,
+  addressed by row and column. A half-imported month is far harder to unpick
+  than one that never landed.
+- **Re-uploading the same file does not double-count.** Rows matching time you
+  already logged are skipped and counted in `skipped_duplicates`. Pass
+  `allow_duplicates=true` when the repetition is real.
+- **Dates must be `YYYY-MM-DD`.** `05/10/2026` is refused rather than guessed
+  at — it means two different days either side of the Atlantic, and choosing
+  wrong would silently misfile a month of work. Future dates are refused too.
+- **Durations are `1:40` or `1.5`, and a bare number is hours.** `90m` is
+  refused rather than read as 90 hours.
+
 ### Theming
 
 Light and dark are driven by `next-themes`, which sets a `.dark` class on

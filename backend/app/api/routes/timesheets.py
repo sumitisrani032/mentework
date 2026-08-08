@@ -5,9 +5,11 @@ Member on one project cannot log time against another. Private timesheets are
 filtered further — see ``app.services.timesheets.may_see``.
 """
 
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -18,13 +20,17 @@ from app.models.role import Feature
 from app.models.timesheet import TimeEntry, Timesheet
 from app.models.user import User
 from app.schemas.timesheet import (
+    ImportRowError,
     TimeEntryCreate,
     TimeEntryProjectRead,
     TimeEntryRead,
     TimeEntryTimesheetRead,
+    TimeImportRejected,
+    TimeImportResult,
     TimesheetCreate,
     TimesheetRead,
 )
+from app.services import time_import
 from app.services import timesheets as service
 from app.services.rbac import effective_permissions
 
@@ -149,6 +155,20 @@ async def create_timesheet(
     return _to_read(reloaded, service.Totals(), current_user.id)
 
 
+# Declared before "/{timesheet_id}": routes match in order, so a literal path
+# has to come first or it is swallowed by the timesheet_id parameter.
+@router.get(
+    "/import-template",
+    response_class=PlainTextResponse,
+    summary="Download a blank CSV to fill in",
+)
+async def read_import_template(project: CanViewTimesheets) -> PlainTextResponse:
+    return PlainTextResponse(
+        time_import.TEMPLATE,
+        headers={"Content-Disposition": 'attachment; filename="time-import-template.csv"'},
+    )
+
+
 @router.get("/{timesheet_id}", response_model=TimesheetRead, summary="Read a single timesheet")
 async def read_timesheet(
     timesheet_id: int,
@@ -223,6 +243,109 @@ async def create_time_entry(
 
     totals = await service.totals_for(db, [timesheet.id])
     return _entry_to_read(entry, timesheet, project, totals[timesheet.id], current_user.id)
+
+
+@router.post(
+    "/{timesheet_id}/time/import",
+    response_model=TimeImportResult,
+    summary="Bulk-upload logged time from a CSV",
+)
+async def import_time_entries(
+    timesheet_id: int,
+    project: CanCreateTimesheets,
+    current_user: CurrentUser,
+    db: DbSession,
+    file: Annotated[UploadFile, File(description="CSV: date, logged_hours, description, status")],
+    dry_run: Annotated[bool, Query(description="Validate without saving")] = False,
+    allow_duplicates: Annotated[
+        bool, Query(description="Log rows that match time already recorded")
+    ] = False,
+) -> TimeImportResult:
+    """Import a month of logged time in one go.
+
+    The file is validated in full before anything is written: a single bad row
+    rejects the upload with a list of what to fix, because a half-imported
+    month is far harder to unpick than one that never landed.
+    """
+    timesheet = await _load_timesheet(db, project, timesheet_id, current_user)
+    if timesheet.is_archived:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "This timesheet is archived and cannot take new time."
+        )
+
+    parsed = time_import.parse_csv(await file.read(), today=datetime.now(UTC).date())
+    if not parsed.ok:
+        _reject(parsed.errors)
+
+    # Re-uploading the same file is the most common way to double-count a
+    # month, so matching rows are skipped unless explicitly allowed.
+    skipped = 0
+    to_write = parsed.entries
+    if not allow_duplicates:
+        existing = await _existing_fingerprints(db, timesheet.id, current_user.id)
+        to_write = [
+            entry for entry in parsed.entries if time_import.fingerprint(entry) not in existing
+        ]
+        skipped = len(parsed.entries) - len(to_write)
+
+    if not dry_run and to_write:
+        db.add_all(
+            TimeEntry(
+                timesheet_id=timesheet.id,
+                entry_date=entry.entry_date,
+                logged_minutes=entry.logged_minutes,
+                status=entry.status,
+                description=entry.description,
+                creator_id=current_user.id,
+            )
+            for entry in to_write
+        )
+        await db.commit()
+
+    written_minutes = sum(entry.logged_minutes for entry in to_write)
+    hours, minutes = divmod(written_minutes, 60)
+    return TimeImportResult(
+        imported=len(to_write),
+        skipped_duplicates=skipped,
+        logged_hours=hours,
+        logged_mins=minutes,
+        dry_run=dry_run,
+    )
+
+
+def _reject(errors: list[time_import.RowError]) -> None:
+    """Turn parse errors into a 422 the uploader can act on."""
+    shown = errors[:50]
+    raise HTTPException(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail=TimeImportRejected(
+            message=(
+                f"Nothing was imported: {len(errors)} problem(s) in the file."
+                + ("" if len(shown) == len(errors) else f" Showing the first {len(shown)}.")
+            ),
+            errors=[
+                ImportRowError(row=error.row, column=error.column, message=error.message)
+                for error in shown
+            ],
+        ).model_dump(),
+    )
+
+
+async def _existing_fingerprints(
+    db: AsyncSession, timesheet_id: int, creator_id: int
+) -> set[tuple]:
+    result = await db.execute(
+        select(
+            TimeEntry.entry_date,
+            TimeEntry.logged_minutes,
+            TimeEntry.description,
+            TimeEntry.status,
+        ).where(TimeEntry.timesheet_id == timesheet_id, TimeEntry.creator_id == creator_id)
+    )
+    return {
+        (entry_date, minutes, description, status.value)
+        for entry_date, minutes, description, status in result.all()
+    }
 
 
 def _entry_to_read(

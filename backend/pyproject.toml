@@ -13,6 +13,8 @@ dependencies = [
     "alembic>=1.14",
     "pwdlib[argon2]>=0.2.1",
     "pyjwt>=2.10",
+    # Required by FastAPI to accept multipart file uploads.
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]

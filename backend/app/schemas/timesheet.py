@@ -65,6 +65,29 @@ class TimeEntryCreate(BaseModel):
         return self
 
 
+class ImportRowError(BaseModel):
+    """One thing wrong with the uploaded file, addressed by row and column."""
+
+    row: int
+    column: str
+    message: str
+
+
+class TimeImportResult(BaseModel):
+    imported: int
+    skipped_duplicates: int
+    logged_hours: int
+    logged_mins: int
+    dry_run: bool
+
+
+class TimeImportRejected(BaseModel):
+    """Returned with 422 when nothing was written."""
+
+    message: str
+    errors: list[ImportRowError]
+
+
 class TimeEntryTimesheetRead(BaseModel):
     """The nested timesheet summary returned alongside each entry."""
 
