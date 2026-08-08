@@ -35,6 +35,11 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+# The local alembic/ migrations directory would otherwise shadow the installed
+# alembic package and be sorted as first-party.
+known-third-party = ["alembic"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

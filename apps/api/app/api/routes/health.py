@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -8,6 +10,8 @@ from app.core.config import get_settings
 from app.db.session import get_db
 
 router = APIRouter(tags=["health"])
+
+DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
 class HealthResponse(BaseModel):
@@ -28,7 +32,7 @@ async def read_health() -> HealthResponse:
 
 
 @router.get("/health/db", response_model=ReadinessResponse, summary="Readiness probe")
-async def read_db_health(db: AsyncSession = Depends(get_db)) -> ReadinessResponse:
+async def read_db_health(db: DbSession) -> ReadinessResponse:
     """Verify the API can reach PostgreSQL."""
     try:
         await db.execute(text("SELECT 1"))
