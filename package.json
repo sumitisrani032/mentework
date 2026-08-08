@@ -14,9 +14,16 @@
     "dev:web": "npm run dev --workspace apps/web",
     "dev:api": "apps/api/.venv/bin/uvicorn app.main:app --reload --port 8000 --app-dir apps/api",
     "build": "npm run build --workspace apps/web",
-    "lint": "npm run lint --workspace apps/web",
+    "lint": "npm run lint:web && npm run lint:api",
+    "lint:web": "npm run lint --workspace apps/web",
+    "lint:api": "cd apps/api && .venv/bin/ruff check . && .venv/bin/ruff format --check .",
+    "test": "npm run test:api",
+    "test:api": "cd apps/api && .venv/bin/pytest",
+    "setup:api": "cd apps/api && uv venv .venv --python 3.12 && uv pip install --python .venv/bin/python -e \".[dev]\"",
     "db:up": "docker compose up -d",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "db:migrate": "cd apps/api && .venv/bin/alembic upgrade head",
+    "db:revision": "cd apps/api && .venv/bin/alembic revision --autogenerate -m"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
