@@ -60,7 +60,10 @@ DEFAULT_ROLES: tuple[RoleDefinition, ...] = (
         permissions={
             Feature.PROJECTS: MANAGE,
             Feature.TASKS: FULL,
-            Feature.TIMESHEET: MANAGE,
+            # FULL rather than MANAGE: managing a project's time means being
+            # able to correct and remove entries logged by the team, and to see
+            # private timesheets when auditing.
+            Feature.TIMESHEET: FULL,
             Feature.GANTT: MANAGE,
             Feature.CALENDAR: MANAGE,
             Feature.DISCUSSIONS: FULL,

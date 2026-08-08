@@ -85,6 +85,17 @@ def may_see(timesheet: Timesheet, *, user_id: int, can_manage: bool) -> bool:
     return any(assignee.user_id == user_id for assignee in timesheet.assignees)
 
 
+def may_modify(entry: TimeEntry, *, user_id: int, can_manage: bool) -> bool:
+    """Whether a user may change or remove one time entry.
+
+    You may always act on your own time with the matching permission. Touching
+    somebody else's additionally needs the manage-level grant — the same
+    ``timesheet`` delete permission that reveals private timesheets — so an
+    ordinary member cannot quietly rewrite a colleague's hours.
+    """
+    return can_manage or entry.creator_id == user_id
+
+
 def assignee_ids(timesheet: Timesheet) -> list[int]:
     return [assignee.user_id for assignee in timesheet.assignees]
 

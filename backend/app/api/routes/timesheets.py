@@ -22,10 +22,12 @@ from app.models.user import User
 from app.schemas.timesheet import (
     ImportPreviewRow,
     ImportRowError,
+    LoggedByRead,
     TimeEntryCreate,
     TimeEntryProjectRead,
     TimeEntryRead,
     TimeEntryTimesheetRead,
+    TimeEntryUpdate,
     TimeImportRejected,
     TimeImportResult,
     TimesheetCreate,
@@ -42,6 +44,12 @@ CanViewTimesheets = Annotated[
 ]
 CanCreateTimesheets = Annotated[
     Project, Depends(require_project_permission(Feature.TIMESHEET, "create"))
+]
+CanEditTimesheets = Annotated[
+    Project, Depends(require_project_permission(Feature.TIMESHEET, "edit"))
+]
+CanDeleteTimesheets = Annotated[
+    Project, Depends(require_project_permission(Feature.TIMESHEET, "delete"))
 ]
 
 
@@ -80,6 +88,9 @@ def _to_read(timesheet: Timesheet, totals: service.Totals, viewer_id: int) -> Ti
     logged_hours, logged_mins = service.split_minutes(totals.logged)
     billable_hours, billable_mins = service.split_minutes(totals.billable)
     billed_hours, billed_mins = service.split_minutes(totals.billed)
+    non_billable_hours, non_billable_mins = service.split_minutes(
+        totals.logged - totals.billable - totals.billed
+    )
 
     return TimesheetRead(
         id=timesheet.id,
@@ -93,6 +104,8 @@ def _to_read(timesheet: Timesheet, totals: service.Totals, viewer_id: int) -> Ti
         billable_mins=billable_mins,
         billed_hours=billed_hours,
         billed_mins=billed_mins,
+        non_billable_hours=non_billable_hours,
+        non_billable_mins=non_billable_mins,
         creator_id=timesheet.creator_id,
         assigned=service.assignee_ids(timesheet),
         private=timesheet.is_private,
@@ -202,11 +215,28 @@ async def read_time_entries(
     )
     entries = list(result.scalars().all())
     totals = await service.totals_for(db, [timesheet.id])
+    authors = await _authors_of(db, entries)
 
     return [
-        _entry_to_read(entry, timesheet, project, totals[timesheet.id], current_user.id)
+        _entry_to_read(
+            entry,
+            timesheet,
+            project,
+            totals[timesheet.id],
+            current_user.id,
+            authors.get(entry.creator_id),
+        )
         for entry in entries
     ]
+
+
+async def _authors_of(db: AsyncSession, entries: list[TimeEntry]) -> dict[int, User]:
+    """Load every entry's author in one query, not one per row."""
+    ids = {entry.creator_id for entry in entries if entry.creator_id is not None}
+    if not ids:
+        return {}
+    result = await db.execute(select(User).where(User.id.in_(ids)))
+    return {user.id: user for user in result.scalars().all()}
 
 
 @router.post(
@@ -243,7 +273,9 @@ async def create_time_entry(
     await db.refresh(entry)
 
     totals = await service.totals_for(db, [timesheet.id])
-    return _entry_to_read(entry, timesheet, project, totals[timesheet.id], current_user.id)
+    return _entry_to_read(
+        entry, timesheet, project, totals[timesheet.id], current_user.id, current_user
+    )
 
 
 @router.post(
@@ -334,6 +366,97 @@ def _preview_row(entry: time_import.ParsedEntry, duplicate: bool) -> ImportPrevi
     )
 
 
+async def _load_entry(
+    db: AsyncSession,
+    project: Project,
+    timesheet_id: int,
+    entry_id: int,
+    user: User,
+    *,
+    action: str,
+) -> tuple[TimeEntry, Timesheet]:
+    """Load an entry the caller is allowed to change.
+
+    Missing and invisible are both 404. Somebody else's entry is 403, because
+    at that point the caller already knows it exists.
+    """
+    timesheet = await _load_timesheet(db, project, timesheet_id, user)
+    if timesheet.is_archived:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "This timesheet is archived and cannot be changed."
+        )
+
+    entry = await db.get(TimeEntry, entry_id)
+    if entry is None or entry.timesheet_id != timesheet.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Time entry not found")
+
+    can_manage = await _can_manage(db, user, project.id)
+    if not service.may_modify(entry, user_id=user.id, can_manage=can_manage):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"You can only {action} time you logged yourself.",
+        )
+    return entry, timesheet
+
+
+@router.patch(
+    "/{timesheet_id}/time/{entry_id}",
+    response_model=TimeEntryRead,
+    summary="Change a logged time entry",
+)
+async def update_time_entry(
+    timesheet_id: int,
+    entry_id: int,
+    payload: TimeEntryUpdate,
+    project: CanEditTimesheets,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> TimeEntryRead:
+    entry, timesheet = await _load_entry(
+        db, project, timesheet_id, entry_id, current_user, action="edit"
+    )
+
+    changed = payload.model_fields_set
+    if "entry_date" in changed and payload.entry_date is not None:
+        if payload.entry_date > datetime.now(UTC).date():
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "Time cannot be logged before it is spent.",
+            )
+        entry.entry_date = payload.entry_date
+    if changed & {"logged_hours", "logged_mins"}:
+        entry.logged_minutes = (payload.logged_hours or 0) * 60 + (payload.logged_mins or 0)
+    if "status" in changed and payload.status is not None:
+        entry.status = payload.status
+    if "description" in changed:
+        entry.description = (payload.description or "").strip() or None
+
+    await db.commit()
+    await db.refresh(entry)
+
+    totals = await service.totals_for(db, [timesheet.id])
+    return _entry_to_read(
+        entry, timesheet, project, totals[timesheet.id], current_user.id, current_user
+    )
+
+
+@router.delete(
+    "/{timesheet_id}/time/{entry_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a logged time entry",
+)
+async def delete_time_entry(
+    timesheet_id: int,
+    entry_id: int,
+    project: CanDeleteTimesheets,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> None:
+    entry, _ = await _load_entry(db, project, timesheet_id, entry_id, current_user, action="delete")
+    await db.delete(entry)
+    await db.commit()
+
+
 def _reject(errors: list[time_import.RowError]) -> None:
     """Turn parse errors into a 422 the uploader can act on."""
     shown = errors[:50]
@@ -369,12 +492,20 @@ async def _existing_fingerprints(
     }
 
 
+def _initials(full_name: str) -> str:
+    parts = [part for part in full_name.split() if part]
+    if not parts:
+        return "?"
+    return (parts[0][0] + (parts[-1][0] if len(parts) > 1 else "")).upper()
+
+
 def _entry_to_read(
     entry: TimeEntry,
     timesheet: Timesheet,
     project: Project,
     totals: service.Totals,
     viewer_id: int,
+    logged_by: User | None = None,
 ) -> TimeEntryRead:
     logged_hours, logged_mins = divmod(entry.logged_minutes, 60)
     sheet_logged_hours, sheet_logged_mins = service.split_minutes(totals.logged)
@@ -392,6 +523,13 @@ def _entry_to_read(
         by_me=entry.creator_id == viewer_id,
         project=TimeEntryProjectRead(id=project.id, name=project.name),
         creator_id=entry.creator_id,
+        logged_by=LoggedByRead(
+            id=logged_by.id,
+            full_name=logged_by.full_name,
+            initials=_initials(logged_by.full_name),
+        )
+        if logged_by is not None
+        else None,
         timesheet=TimeEntryTimesheetRead(
             id=timesheet.id,
             title=timesheet.title,
