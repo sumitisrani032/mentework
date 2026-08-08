@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
+/* next-themes sets class="dark" on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --surface: #f5f8f9;
+  --surface-strong: #e9f1f2;
+  --foreground: #0d2a30;
+  --muted: #567179;
+  --border: #dde7e9;
+  --primary: #0d8f88;
+  --primary-hover: #0a736e;
+  --primary-foreground: #ffffff;
+  --accent: #f0a500;
+  --ring: #0d8f88;
+}
+
+.dark {
+  --background: #08161a;
+  --surface: #0e2126;
+  --surface-strong: #143036;
+  --foreground: #e8f2f3;
+  --muted: #93aeb4;
+  --border: #1d3a41;
+  --primary: #2bbfb2;
+  --primary-hover: #45d6c8;
+  --primary-foreground: #04212a;
+  --accent: #ffc44d;
+  --ring: #2bbfb2;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-ring: var(--ring);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Theme changes should be instant, but in-page transitions should not be. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
