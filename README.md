@@ -28,6 +28,7 @@ belongs to exactly one organisation.
 | --------------- | ------------------------------------------------------------------ |
 | `organizations` | `slug` is the subdomain. A CHECK constraint keeps it DNS-safe, and `RESERVED_SLUGS` blocks names like `www` and `api`. |
 | `users`         | Scoped to one organisation. `(organization_id, email)` is unique, so the same address can exist in several tenants. Deleting an organisation cascades. |
+| `projects`      | `status` (`planning`/`active`/`on_hold`/`completed`/`archived`), dates, `owner_id` and `created_by`. Both user references are SET NULL, so losing a person never deletes their projects, and a CHECK rejects an end date before its start. |
 
 ### Roles and permissions
 
@@ -85,12 +86,51 @@ npm run dev       # run web and api together
 - Web: http://localhost:3000
 - API: http://localhost:8000 (interactive docs at `/docs`)
 
-`/` is the marketing home page, `/settings/roles` is the permission matrix, and
-`/status` shows live API health.
+| Route              | Address                                     |
+| ------------------ | ------------------------------------------- |
+| Marketing home     | `localhost:3000`                            |
+| Sign in            | `acme.localhost:3000/login`                 |
+| Dashboard          | `acme.localhost:3000/dashboard`             |
+| Permission matrix  | `/settings/roles`                           |
+| API status         | `/status`                                   |
 
-> **Not yet secured.** The API has no authentication, so every endpoint is open
-> and `/settings/roles` edits the first organisation it finds. Auth must land
-> before this is exposed anywhere but a local machine.
+## Signing in
+
+Sign-in is **per tenant**: each organisation has its own page on its own
+subdomain, and credentials are only checked inside that organisation. There is
+no sign-up — accounts are created by an administrator.
+
+Locally, browsers resolve any `*.localhost` name to the loopback address, so
+`acme.localhost:3000/login` works with no `/etc/hosts` entry. The subdomain the
+page is served on decides the tenant; it is never taken from the form.
+`NEXT_PUBLIC_ROOT_DOMAIN` sets the domain subdomains hang off.
+
+After `npm run db:seed`, sign in as `ada@acme.test` with password `mentework`
+(the script prints every demo account and its role).
+
+How it works:
+
+- Passwords are hashed with **argon2id**, and a correct password stored with
+  outdated parameters is transparently rehashed on sign-in.
+- The API returns a **JWT** carrying the organisation it was issued for. That
+  claim is re-checked against the user's current organisation on every request,
+  so a token cannot be replayed against another tenant.
+- The token is exchanged for an **httpOnly cookie** by a Next.js route handler,
+  so it never reaches client-side JavaScript. The cookie is set with no
+  `Domain`, making it host-only — a session on one subdomain is never sent to
+  another.
+- Every sign-in failure returns one identical 401, and a throwaway hash runs on
+  the miss paths, so an unknown workspace, an unknown address and a wrong
+  password cannot be told apart by response or by timing.
+
+`SECRET_KEY` defaults to an obvious placeholder and startup **fails** if that
+placeholder is still set outside development. Generate one with
+`openssl rand -hex 32`.
+
+> **Still open:** the organisation and role endpoints have no authorisation
+> checks yet — any signed-in user, or none, can call them. They need to be
+> gated on the `roles` permission before this leaves a local machine. There is
+> also no rate limiting on sign-in.
 
 ### Theming
 
