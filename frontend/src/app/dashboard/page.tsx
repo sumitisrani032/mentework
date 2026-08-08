@@ -124,8 +124,8 @@ export default async function DashboardPage() {
           </section>
 
           <div className="mt-10 flex flex-wrap gap-6 text-sm">
-            <Link href="/timesheets" className="text-primary hover:underline">
-              Timesheets →
+            <Link href="/projects" className="text-primary hover:underline">
+              Projects →
             </Link>
             <Link href="/settings/roles" className="text-primary hover:underline">
               Manage roles and permissions →

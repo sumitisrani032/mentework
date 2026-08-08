@@ -143,6 +143,8 @@ grid and access changes with it.
 | `GET /organizations/me`         | any session                      |
 | `.../timesheets` (read)         | `timesheet` · view **in that project** |
 | `.../timesheets` (write)        | `timesheet` · create **in that project** |
+| `PATCH .../time/{id}`           | `timesheet` · edit, plus ownership |
+| `DELETE .../time/{id}`          | `timesheet` · delete             |
 
 Two rules run through all of it:
 
@@ -190,6 +192,31 @@ Two decisions worth knowing:
 Private timesheets are visible only to their creator, their assignees, and
 anyone whose role can *delete* timesheets — otherwise an administrator could
 not audit time they did not log themselves.
+
+### Changing logged time
+
+```
+PATCH  /api/v1/projects/{project_id}/timesheets/{timesheet_id}/time/{entry_id}
+DELETE /api/v1/projects/{project_id}/timesheets/{timesheet_id}/time/{entry_id}
+```
+
+`PATCH` is partial: only fields present in the body are applied, so omitting
+`description` leaves it alone while sending it as `null` clears it.
+
+Two rules decide who may act on an entry:
+
+- The matrix decides **what** you can do: `timesheet` edit to change an entry,
+  `timesheet` delete to remove one.
+- Ownership decides **whose**. You may always act on time you logged yourself.
+  Touching someone else's additionally needs the `timesheet` delete grant — the
+  same manage-level signal that reveals private timesheets — so an ordinary
+  member cannot quietly rewrite a colleague's hours.
+
+With the defaults that means a **Member can correct their own entries but not
+delete them, and cannot touch anyone else's**; a **Project Manager can do both,
+for anyone on their project**. To let members delete their own time, tick
+Delete for `timesheet` on the Member role at `/settings/roles` — no code change
+needed.
 
 ### Bulk upload
 
@@ -270,6 +297,7 @@ not collide with a PostgreSQL installed on the host. Change `POSTGRES_PORT` and
 | `npm run db:migrate`                   | Apply migrations (`alembic upgrade head`)      |
 | `npm run db:revision -- "add users"`   | Autogenerate a migration from model changes    |
 | `npm run db:seed`                      | Create the demo `acme` organisation with roles, projects and users |
+| `npm run org:create -- --help`         | Provision a new tenant and its first administrator |
 
 ## Environment files
 

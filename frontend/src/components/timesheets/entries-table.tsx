@@ -1,4 +1,20 @@
-import { type TimeEntry, formatDuration, totalDuration } from "@/lib/timesheets";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { buttonClass } from "@/components/ui/button";
+import { Avatar } from "@/components/timesheets/avatar";
+import {
+  type FeaturePermission,
+  type TimeEntry,
+  deleteTimeEntry,
+  formatDuration,
+  totalDuration,
+  updateTimeEntry,
+} from "@/lib/timesheets";
+
+const STATUSES: TimeEntry["status"][] = ["none", "billable", "billed"];
 
 const STATUS_LABEL: Record<TimeEntry["status"], string> = {
   none: "—",
@@ -12,7 +28,25 @@ const STATUS_CLASS: Record<TimeEntry["status"], string> = {
   billed: "text-muted",
 };
 
-export function EntriesTable({ entries }: { entries: TimeEntry[] }) {
+const INPUT_CLASS =
+  "rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm " +
+  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring";
+
+export function EntriesTable({
+  projectId,
+  timesheetId,
+  entries,
+  permission,
+}: {
+  projectId: number;
+  timesheetId: number;
+  entries: TimeEntry[];
+  permission: FeaturePermission;
+}) {
+  const [editing, setEditing] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   if (entries.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface p-6">
@@ -25,6 +59,9 @@ export function EntriesTable({ entries }: { entries: TimeEntry[] }) {
   }
 
   const total = totalDuration(entries);
+  // Delete is the manage-level grant, so holding it also allows acting on
+  // other people's entries.
+  const canManageOthers = permission.delete;
 
   return (
     <section>
@@ -36,14 +73,26 @@ export function EntriesTable({ entries }: { entries: TimeEntry[] }) {
           </span>
         </h3>
         <p className="text-sm text-muted">
-          Total <span className="font-medium text-foreground">{formatDuration(total.hours, total.mins)}</span>
+          Total{" "}
+          <span className="font-medium text-foreground">
+            {formatDuration(total.hours, total.mins)}
+          </span>
         </p>
       </div>
+
+      {error ? (
+        <p role="alert" className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-3 overflow-x-auto rounded-xl border border-border">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-surface">
+              <th scope="col" className="px-4 py-3 text-left font-semibold">
+                Logged by
+              </th>
               <th scope="col" className="px-4 py-3 text-left font-semibold">
                 Date
               </th>
@@ -56,36 +105,290 @@ export function EntriesTable({ entries }: { entries: TimeEntry[] }) {
               <th scope="col" className="px-4 py-3 text-left font-semibold">
                 Status
               </th>
+              <th scope="col" className="px-4 py-3 text-right font-semibold">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id} className="border-b border-border last:border-b-0">
-                <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap">{entry.date}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap">
-                  {formatDuration(entry.logged_hours, entry.logged_mins)}
-                  {entry.timer ? (
-                    <span className="ml-2 text-xs text-muted" title="Recorded with a timer">
-                      timer
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-2.5">
-                  {entry.description ?? <span className="text-muted">—</span>}
-                  {!entry.by_me ? (
-                    <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs text-muted">
-                      someone else
-                    </span>
-                  ) : null}
-                </td>
-                <td className={`px-4 py-2.5 whitespace-nowrap ${STATUS_CLASS[entry.status]}`}>
-                  {STATUS_LABEL[entry.status]}
-                </td>
-              </tr>
-            ))}
+            {entries.map((entry) => {
+              const mine = entry.by_me;
+              const mayChange = permission.edit && (mine || canManageOthers);
+              const mayRemove = permission.delete;
+
+              return editing === entry.id ? (
+                <EditRow
+                  key={entry.id}
+                  projectId={projectId}
+                  timesheetId={timesheetId}
+                  entry={entry}
+                  onDone={() => {
+                    setEditing(null);
+                    setError(null);
+                  }}
+                  onError={setError}
+                />
+              ) : (
+                <ReadRow
+                  key={entry.id}
+                  projectId={projectId}
+                  timesheetId={timesheetId}
+                  entry={entry}
+                  mayChange={mayChange}
+                  mayRemove={mayRemove}
+                  confirming={confirming === entry.id}
+                  onEdit={() => {
+                    setEditing(entry.id);
+                    setConfirming(null);
+                    setError(null);
+                  }}
+                  onAskDelete={() => setConfirming(entry.id)}
+                  onCancelDelete={() => setConfirming(null)}
+                  onError={setError}
+                />
+              );
+            })}
           </tbody>
         </table>
       </div>
     </section>
+  );
+}
+
+function ReadRow({
+  projectId,
+  timesheetId,
+  entry,
+  mayChange,
+  mayRemove,
+  confirming,
+  onEdit,
+  onAskDelete,
+  onCancelDelete,
+  onError,
+}: {
+  projectId: number;
+  timesheetId: number;
+  entry: TimeEntry;
+  mayChange: boolean;
+  mayRemove: boolean;
+  confirming: boolean;
+  onEdit: () => void;
+  onAskDelete: () => void;
+  onCancelDelete: () => void;
+  onError: (message: string | null) => void;
+}) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  async function remove() {
+    setPending(true);
+    onError(null);
+    const result = await deleteTimeEntry(projectId, timesheetId, entry.id);
+    setPending(false);
+    if (result.ok) {
+      onCancelDelete();
+      router.refresh();
+    } else {
+      onError(result.error);
+      onCancelDelete();
+    }
+  }
+
+  return (
+    <tr className="border-b border-border last:border-b-0">
+      <td className="px-4 py-2.5 whitespace-nowrap">
+        <span className="flex items-center gap-2">
+          <Avatar person={entry.logged_by} />
+          <span className={entry.by_me ? "font-medium" : ""}>
+            {entry.logged_by?.full_name ?? "Unknown"}
+          </span>
+        </span>
+      </td>
+      <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap">{entry.date}</td>
+      <td className="px-4 py-2.5 whitespace-nowrap">
+        {formatDuration(entry.logged_hours, entry.logged_mins)}
+        {entry.timer ? (
+          <span className="ml-2 text-xs text-muted" title="Recorded with a timer">
+            timer
+          </span>
+        ) : null}
+      </td>
+      <td className="px-4 py-2.5">
+        {entry.description ?? <span className="text-muted">—</span>}
+      </td>
+      <td className={`px-4 py-2.5 whitespace-nowrap ${STATUS_CLASS[entry.status]}`}>
+        {STATUS_LABEL[entry.status]}
+      </td>
+      <td className="px-4 py-2.5 text-right whitespace-nowrap">
+        {confirming ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs text-muted">Delete this entry?</span>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={pending}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-500/10"
+            >
+              {pending ? "Deleting…" : "Yes, delete"}
+            </button>
+            <button
+              type="button"
+              onClick={onCancelDelete}
+              className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface"
+            >
+              Keep
+            </button>
+          </span>
+        ) : (
+          <span className="inline-flex gap-1">
+            {mayChange ? (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground"
+              >
+                Edit
+              </button>
+            ) : null}
+            {mayRemove ? (
+              <button
+                type="button"
+                onClick={onAskDelete}
+                className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-red-500/10 hover:text-red-500"
+              >
+                Delete
+              </button>
+            ) : null}
+          </span>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function EditRow({
+  projectId,
+  timesheetId,
+  entry,
+  onDone,
+  onError,
+}: {
+  projectId: number;
+  timesheetId: number;
+  entry: TimeEntry;
+  onDone: () => void;
+  onError: (message: string | null) => void;
+}) {
+  const router = useRouter();
+  const [date, setDate] = useState(entry.date);
+  const [hours, setHours] = useState(String(entry.logged_hours));
+  const [mins, setMins] = useState(String(entry.logged_mins));
+  const [description, setDescription] = useState(entry.description ?? "");
+  const [status, setStatus] = useState<TimeEntry["status"]>(entry.status);
+  const [pending, setPending] = useState(false);
+
+  async function save() {
+    setPending(true);
+    onError(null);
+    const result = await updateTimeEntry(projectId, timesheetId, entry.id, {
+      date,
+      logged_hours: Number(hours) || 0,
+      logged_mins: Number(mins) || 0,
+      status,
+      description: description.trim() === "" ? null : description.trim(),
+    });
+    setPending(false);
+    if (result.ok) {
+      onDone();
+      router.refresh();
+    } else {
+      onError(result.error);
+    }
+  }
+
+  // One full-width cell rather than one input per column: the fields need more
+  // room than the read-only columns allow, and this lets them wrap instead of
+  // pushing the buttons out of view.
+  return (
+    <tr className="border-b border-border bg-surface last:border-b-0">
+      <td colSpan={6} className="px-4 py-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs text-muted">
+            Date
+            <input
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              className={`${INPUT_CLASS} mt-1 block w-40`}
+            />
+          </label>
+
+          <label className="text-xs text-muted">
+            Time
+            <span className="mt-1 flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                value={hours}
+                onChange={(event) => setHours(event.target.value)}
+                aria-label="Hours"
+                className={`${INPUT_CLASS} w-16`}
+              />
+              <span aria-hidden>h</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                value={mins}
+                onChange={(event) => setMins(event.target.value)}
+                aria-label="Minutes"
+                className={`${INPUT_CLASS} w-16`}
+              />
+              <span aria-hidden>m</span>
+            </span>
+          </label>
+
+          <label className="min-w-52 flex-1 text-xs text-muted">
+            Description
+            <input
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="What did you work on?"
+              className={`${INPUT_CLASS} mt-1 block w-full`}
+            />
+          </label>
+
+          <label className="text-xs text-muted">
+            Status
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as TimeEntry["status"])}
+              className={`${INPUT_CLASS} mt-1 block`}
+            >
+              {STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {value === "none" ? "No status" : STATUS_LABEL[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex gap-2">
+            <button type="button" onClick={onDone} className={buttonClass("ghost", "sm")}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={pending}
+              className={buttonClass("primary", "sm")}
+            >
+              {pending ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
   );
 }

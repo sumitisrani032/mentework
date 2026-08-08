@@ -23,6 +23,28 @@ export type Session = {
 
 export type Workspace = { name: string; slug: string };
 
+/**
+ * Reshape the session's organisation-wide grants to match the per-project
+ * permission map. The API spells these `can_view` while the project endpoint
+ * spells them `view`, and the navigation reads one shape.
+ */
+export function organizationPermissions(session: Session): Record<
+  string,
+  { view: boolean; create: boolean; edit: boolean; delete: boolean }
+> {
+  return Object.fromEntries(
+    session.permissions.map((grant) => [
+      grant.feature,
+      {
+        view: grant.can_view,
+        create: grant.can_create,
+        edit: grant.can_edit,
+        delete: grant.can_delete,
+      },
+    ]),
+  );
+}
+
 /** Look up the workspace a sign-in page belongs to. Null when it does not exist. */
 export async function fetchWorkspace(slug: string): Promise<Workspace | null> {
   try {
