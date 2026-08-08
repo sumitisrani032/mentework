@@ -1,6 +1,7 @@
 # Mentework
 
-Monorepo containing the Mentework web frontend and API backend.
+A multi-tenant SaaS project-management workspace. Each customer organisation
+gets its own subdomain and its own isolated data.
 
 ## Stack
 
@@ -14,10 +15,24 @@ Monorepo containing the Mentework web frontend and API backend.
 ## Layout
 
 ```
-apps/
-  web/   Next.js application
-  api/   FastAPI application
+frontend/   Next.js application
+backend/    FastAPI application
 ```
+
+## Data model
+
+`Organization` is the root of the model — the tenant. Every other record
+belongs to exactly one organisation.
+
+| Table           | Notes                                                              |
+| --------------- | ------------------------------------------------------------------ |
+| `organizations` | `slug` is the subdomain. A CHECK constraint keeps it DNS-safe, and `RESERVED_SLUGS` blocks names like `www` and `api`. |
+| `users`         | Scoped to one organisation. `(organization_id, email)` is unique, so the same address can exist in several tenants. Deleting an organisation cascades. |
+
+Roles are currently a provisional `owner` / `admin` / `member` / `guest` set on
+`users.role`, stored as `VARCHAR(32)` with a CHECK constraint generated from the
+`UserRole` enum. Adding or renaming a role is an ordinary migration — see
+`backend/app/models/user.py`. The full permission matrix is still to come.
 
 ## Prerequisites
 
@@ -41,8 +56,22 @@ npm run dev       # run web and api together
 - Web: http://localhost:3000
 - API: http://localhost:8000 (interactive docs at `/docs`)
 
-The landing page calls the API health endpoint, so it shows `online` once both
-processes are up.
+`/` is the marketing home page and `/status` shows live API health.
+
+### Theming
+
+Light and dark are driven by `next-themes`, which sets a `.dark` class on
+`<html>`. Colours are CSS custom properties in `frontend/src/app/globals.css`,
+re-exported to Tailwind through `@theme` — so change a token there and both the
+utilities and the components follow. The default is the visitor's system
+setting.
+
+### Marketing copy
+
+All wording lives in `frontend/src/lib/content.ts`. The testimonials there are
+placeholders with fictional names; replace them with real, attributable quotes
+before launch. The hero deliberately carries product terms rather than G2 or
+Capterra badges, since those have to be earned before they can be shown.
 
 ### A note on ports
 
