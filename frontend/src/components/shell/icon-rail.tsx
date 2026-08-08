@@ -104,6 +104,15 @@ function KeyIcon({ className }: IconProps) {
   );
 }
 
+function PeopleIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <circle cx="9" cy="8.5" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 5.3a3.5 3.5 0 0 1 0 6.4M17.5 20a6.5 6.5 0 0 0-2-4.7" />
+    </svg>
+  );
+}
+
 function ShieldIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
@@ -172,11 +181,13 @@ export function IconRail({
   organizationName,
   canCreateProject,
   canManageRoles,
+  canSeeMembers,
 }: {
   fullName: string;
   organizationName: string;
   canCreateProject: boolean;
   canManageRoles: boolean;
+  canSeeMembers: boolean;
 }) {
   const pathname = usePathname();
 
@@ -212,6 +223,7 @@ export function IconRail({
           fullName={fullName}
           organizationName={organizationName}
           canManageRoles={canManageRoles}
+          canSeeMembers={canSeeMembers}
         />
       </div>
     </aside>
@@ -269,10 +281,12 @@ function AccountMenu({
   fullName,
   organizationName,
   canManageRoles,
+  canSeeMembers,
 }: {
   fullName: string;
   organizationName: string;
   canManageRoles: boolean;
+  canSeeMembers: boolean;
 }) {
   const menu = useRef<HTMLDetailsElement>(null);
 
@@ -330,6 +344,11 @@ function AccountMenu({
         <MenuLink href="/settings/profile#change-password" icon={KeyIcon} onNavigate={closeMenu}>
           Change password
         </MenuLink>
+        {canSeeMembers ? (
+          <MenuLink href="/settings/members" icon={PeopleIcon} onNavigate={closeMenu}>
+            People
+          </MenuLink>
+        ) : null}
         {canManageRoles ? (
           <MenuLink href="/settings/roles" icon={ShieldIcon} onNavigate={closeMenu}>
             Roles &amp; permissions

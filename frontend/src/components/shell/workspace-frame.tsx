@@ -23,6 +23,9 @@ export function WorkspaceFrame({
   const canManageRoles = session.permissions.some(
     (grant) => grant.feature === "roles" && grant.can_view,
   );
+  const canSeeMembers = session.permissions.some(
+    (grant) => grant.feature === "members" && grant.can_view,
+  );
 
   return (
     <div className="flex min-h-full flex-1">
@@ -31,6 +34,7 @@ export function WorkspaceFrame({
         organizationName={session.organization.name}
         canCreateProject={canCreateProject}
         canManageRoles={canManageRoles}
+        canSeeMembers={canSeeMembers}
       />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>
