@@ -73,12 +73,26 @@ class ImportRowError(BaseModel):
     message: str
 
 
+class ImportPreviewRow(BaseModel):
+    """One parsed row, so the uploader can check it before committing."""
+
+    row: int
+    date: date
+    logged_hours: int
+    logged_mins: int
+    description: str | None
+    status: TimeEntryStatus
+    duplicate: bool
+
+
 class TimeImportResult(BaseModel):
     imported: int
     skipped_duplicates: int
     logged_hours: int
     logged_mins: int
     dry_run: bool
+    # Filled on a dry run only, so a real import does not echo the whole file.
+    preview: list[ImportPreviewRow] = Field(default_factory=list)
 
 
 class TimeImportRejected(BaseModel):

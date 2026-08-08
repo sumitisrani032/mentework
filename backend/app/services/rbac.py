@@ -209,6 +209,42 @@ async def assign_role(
     return assignment
 
 
+async def accessible_project_ids(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    feature: Feature,
+    action: str = "view",
+) -> tuple[bool, set[int]]:
+    """Work out which projects a user may act on, without a query per project.
+
+    Returns ``(organization_wide, project_ids)``. When the first is true the
+    user holds the permission everywhere and the set can be ignored.
+    """
+    column = {
+        "view": RolePermission.can_view,
+        "create": RolePermission.can_create,
+        "edit": RolePermission.can_edit,
+        "delete": RolePermission.can_delete,
+    }[action]
+
+    result = await session.execute(
+        select(UserRole.project_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .join(RolePermission, RolePermission.role_id == Role.id)
+        .where(
+            UserRole.user_id == user_id,
+            RolePermission.feature == feature,
+            column.is_(True),
+        )
+        .distinct()
+    )
+    project_ids = set(result.scalars().all())
+    organization_wide = None in project_ids
+    project_ids.discard(None)
+    return organization_wide, project_ids
+
+
 async def effective_permissions(
     session: AsyncSession,
     *,

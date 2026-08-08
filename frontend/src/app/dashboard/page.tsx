@@ -123,11 +123,14 @@ export default async function DashboardPage() {
             )}
           </section>
 
-          <p className="mt-10 text-sm">
+          <div className="mt-10 flex flex-wrap gap-6 text-sm">
+            <Link href="/timesheets" className="text-primary hover:underline">
+              Timesheets →
+            </Link>
             <Link href="/settings/roles" className="text-primary hover:underline">
               Manage roles and permissions →
             </Link>
-          </p>
+          </div>
         </Container>
       </main>
     </>

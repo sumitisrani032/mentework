@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, health, organizations, roles, timesheets
+from app.api.routes import auth, health, organizations, projects, roles, timesheets
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -25,5 +25,6 @@ app.add_middleware(
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(organizations.router, prefix=settings.api_v1_prefix)
+app.include_router(projects.router, prefix=settings.api_v1_prefix)
 app.include_router(roles.router, prefix=settings.api_v1_prefix)
 app.include_router(timesheets.router, prefix=settings.api_v1_prefix)

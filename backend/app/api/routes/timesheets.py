@@ -20,6 +20,7 @@ from app.models.role import Feature
 from app.models.timesheet import TimeEntry, Timesheet
 from app.models.user import User
 from app.schemas.timesheet import (
+    ImportPreviewRow,
     ImportRowError,
     TimeEntryCreate,
     TimeEntryProjectRead,
@@ -279,14 +280,16 @@ async def import_time_entries(
 
     # Re-uploading the same file is the most common way to double-count a
     # month, so matching rows are skipped unless explicitly allowed.
-    skipped = 0
-    to_write = parsed.entries
-    if not allow_duplicates:
-        existing = await _existing_fingerprints(db, timesheet.id, current_user.id)
-        to_write = [
-            entry for entry in parsed.entries if time_import.fingerprint(entry) not in existing
-        ]
-        skipped = len(parsed.entries) - len(to_write)
+    existing = (
+        set()
+        if allow_duplicates
+        else await _existing_fingerprints(db, timesheet.id, current_user.id)
+    )
+    duplicates = {
+        entry.row for entry in parsed.entries if time_import.fingerprint(entry) in existing
+    }
+    to_write = [entry for entry in parsed.entries if entry.row not in duplicates]
+    skipped = len(duplicates)
 
     if not dry_run and to_write:
         db.add_all(
@@ -310,6 +313,24 @@ async def import_time_entries(
         logged_hours=hours,
         logged_mins=minutes,
         dry_run=dry_run,
+        # Every row, including the duplicates, so the preview can show what
+        # will be skipped rather than silently dropping it.
+        preview=[_preview_row(entry, entry.row in duplicates) for entry in parsed.entries]
+        if dry_run
+        else [],
+    )
+
+
+def _preview_row(entry: time_import.ParsedEntry, duplicate: bool) -> ImportPreviewRow:
+    hours, minutes = divmod(entry.logged_minutes, 60)
+    return ImportPreviewRow(
+        row=entry.row,
+        date=entry.entry_date,
+        logged_hours=hours,
+        logged_mins=minutes,
+        description=entry.description,
+        status=entry.status,
+        duplicate=duplicate,
     )
 
 

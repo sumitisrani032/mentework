@@ -277,13 +277,22 @@ async def test_a_dry_run_validates_without_saving(
         headers=headers,
     )
 
-    assert response.json() == {
-        "imported": 1,
-        "skipped_duplicates": 0,
-        "logged_hours": 1,
-        "logged_mins": 40,
-        "dry_run": True,
-    }
+    body = response.json()
+    assert body["imported"] == 1
+    assert body["dry_run"] is True
+    assert (body["logged_hours"], body["logged_mins"]) == (1, 40)
+    # A dry run returns the parsed rows so the uploader can check them.
+    assert body["preview"] == [
+        {
+            "row": 2,
+            "date": "2026-08-03",
+            "logged_hours": 1,
+            "logged_mins": 40,
+            "description": None,
+            "status": "none",
+            "duplicate": False,
+        }
+    ]
 
     listed = await api_client.get(
         f"/api/v1/projects/{project.id}/timesheets/{timesheet_id}/time", headers=headers
@@ -313,6 +322,27 @@ async def test_a_viewer_cannot_bulk_upload(
     )
 
     assert response.status_code == 403
+
+
+async def test_a_dry_run_flags_rows_that_would_be_skipped(
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+) -> None:
+    """The preview must show duplicates, not quietly drop them."""
+    headers = await auth_headers(member)
+    timesheet_id = await make_timesheet(api_client, project, headers)
+    body = "date,logged_hours,description,status\n2026-08-03,1:00,Standup,none\n"
+
+    await api_client.post(import_url(project, timesheet_id), files=upload(body), headers=headers)
+    preview = await api_client.post(
+        f"{import_url(project, timesheet_id)}?dry_run=true",
+        files=upload(body + "2026-08-04,2:00,New work,billable\n"),
+        headers=headers,
+    )
+
+    rows = preview.json()["preview"]
+    assert [row["duplicate"] for row in rows] == [True, False]
+    assert preview.json()["imported"] == 1
+    assert preview.json()["skipped_duplicates"] == 1
 
 
 async def test_the_template_can_be_downloaded(

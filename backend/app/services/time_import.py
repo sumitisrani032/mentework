@@ -57,6 +57,8 @@ class RowError:
 
 @dataclass(frozen=True, slots=True)
 class ParsedEntry:
+    # The line it came from, so a preview can point back at the file.
+    row: int
     entry_date: date
     logged_minutes: int
     description: str | None
@@ -224,6 +226,7 @@ def parse_csv(content: bytes, *, today: date) -> ParseResult:
         else:
             result.entries.append(
                 ParsedEntry(
+                    row=index,
                     entry_date=entry_date,
                     logged_minutes=minutes,
                     description=description,

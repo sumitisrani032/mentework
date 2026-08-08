@@ -193,7 +193,9 @@ not audit time they did not log themselves.
 
 ### Bulk upload
 
-Anyone who can log time can upload a month at once as CSV. Four columns:
+Anyone who can log time can upload a month at once as CSV, from
+**`/timesheets`** — pick a project and timesheet, drop the file in, check the
+preview, then commit. Four columns:
 
 ```csv
 date,logged_hours,description,status
@@ -213,6 +215,9 @@ Only `date` and `logged_hours` are required; `description` is optional and a
 blank `status` becomes `none`. Common header spellings (`Logged Hours`, `hours`,
 `notes`, `billing`) are accepted, the byte-order mark Excel writes is stripped,
 and blank lines are ignored.
+
+The page always runs a `dry_run` first and shows every parsed row before
+anything is written, so a file is never applied unseen.
 
 Four decisions that shape how it behaves:
 
