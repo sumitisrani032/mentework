@@ -29,10 +29,39 @@ belongs to exactly one organisation.
 | `organizations` | `slug` is the subdomain. A CHECK constraint keeps it DNS-safe, and `RESERVED_SLUGS` blocks names like `www` and `api`. |
 | `users`         | Scoped to one organisation. `(organization_id, email)` is unique, so the same address can exist in several tenants. Deleting an organisation cascades. |
 
-Roles are currently a provisional `owner` / `admin` / `member` / `guest` set on
-`users.role`, stored as `VARCHAR(32)` with a CHECK constraint generated from the
-`UserRole` enum. Adding or renaming a role is an ordinary migration — see
-`backend/app/models/user.py`. The full permission matrix is still to come.
+### Roles and permissions
+
+| Table              | Notes                                                            |
+| ------------------ | ---------------------------------------------------------------- |
+| `roles`            | Per-organisation, so an admin can retune what "Team Lead" means for their tenant. The six built-ins are `is_system`: editable permissions, but not deletable or renameable. |
+| `role_permissions` | One row per (role, feature) with `can_view` / `can_create` / `can_edit` / `can_delete` — exactly the checkbox grid in settings. |
+| `user_roles`       | Many-to-many. A user can hold several roles at once; `project_id` scopes a grant to one project, or is NULL for organisation-wide. |
+
+Built-in roles, seeded when an organisation is created:
+
+| Role               | Scope        |
+| ------------------ | ------------ |
+| Organization Admin | Organisation |
+| Project Manager    | Project      |
+| Team Lead          | Project      |
+| Member             | Project      |
+| Client             | Project      |
+| Viewer             | Project      |
+
+Effective permissions are the **union** of every role that applies in context —
+organisation-wide grants always count, project grants count only inside that
+project. Roles can therefore only add access, never remove it.
+
+Two rules are enforced rather than assumed:
+
+- A permission cannot grant create, edit or delete without view. Checked in the
+  database, in Pydantic and in the UI, so an inconsistent matrix cannot be saved.
+- `user_roles` is unique on `(user_id, role_id, project_id)` with
+  `NULLS NOT DISTINCT`, so a duplicate organisation-wide grant is rejected
+  instead of silently allowed.
+
+Edit the matrix at `/settings/roles`. Definitions live in
+`backend/app/services/rbac.py`.
 
 ## Prerequisites
 
@@ -56,7 +85,12 @@ npm run dev       # run web and api together
 - Web: http://localhost:3000
 - API: http://localhost:8000 (interactive docs at `/docs`)
 
-`/` is the marketing home page and `/status` shows live API health.
+`/` is the marketing home page, `/settings/roles` is the permission matrix, and
+`/status` shows live API health.
+
+> **Not yet secured.** The API has no authentication, so every endpoint is open
+> and `/settings/roles` edits the first organisation it finds. Auth must land
+> before this is exposed anywhere but a local machine.
 
 ### Theming
 
@@ -90,6 +124,7 @@ not collide with a PostgreSQL installed on the host. Change `POSTGRES_PORT` and
 | `npm run db:up` / `npm run db:down`    | Start / stop PostgreSQL                        |
 | `npm run db:migrate`                   | Apply migrations (`alembic upgrade head`)      |
 | `npm run db:revision -- "add users"`   | Autogenerate a migration from model changes    |
+| `npm run db:seed`                      | Create the demo `acme` organisation with roles, projects and users |
 
 ## Environment files
 
