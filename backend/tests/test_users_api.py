@@ -1,0 +1,184 @@
+"""Creating people, which only a role with the members permission may do."""
+
+import httpx
+import pytest
+
+from app.models.organization import Organization
+from app.models.project import Project
+from app.models.role import Role
+
+
+@pytest.fixture
+async def admin(organization: Organization, seeded_roles: dict[str, Role], make_user):
+    return await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+
+
+def member_payload(**overrides) -> dict:
+    payload = {
+        "email": "New.Person@acme.test",
+        "full_name": "New Person",
+        "password": "first-password",
+    }
+    payload.update(overrides)
+    return payload
+
+
+async def test_an_admin_creates_someone_with_a_role(
+    api_client: httpx.AsyncClient, admin, seeded_roles: dict[str, Role], auth_headers
+) -> None:
+    response = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(role_id=str(seeded_roles["organization-admin"].id)),
+        headers=await auth_headers(admin),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["email"] == "new.person@acme.test"  # stored lowercased
+    assert body["roles"] == [
+        {"role": "Organization Admin", "scope": "organization", "project": None}
+    ]
+
+
+async def test_the_new_account_can_sign_in(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    admin,
+    seeded_roles: dict[str, Role],
+    auth_headers,
+) -> None:
+    created = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(role_id=str(seeded_roles["organization-admin"].id)),
+        headers=await auth_headers(admin),
+    )
+    assert created.status_code == 201
+
+    signed_in = await api_client.post(
+        "/api/v1/auth/login",
+        json={
+            "organization_slug": organization.slug,
+            "email": "new.person@acme.test",
+            "password": "first-password",
+        },
+    )
+
+    assert signed_in.status_code == 200
+    assert signed_in.json()["user"]["full_name"] == "New Person"
+
+
+async def test_a_project_role_needs_a_project(
+    api_client: httpx.AsyncClient,
+    project: Project,
+    admin,
+    seeded_roles: dict[str, Role],
+    auth_headers,
+) -> None:
+    headers = await auth_headers(admin)
+
+    with_project = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(
+            email="dara@acme.test",
+            role_id=str(seeded_roles["member"].id),
+            project_id=str(project.id),
+        ),
+        headers=headers,
+    )
+    assert with_project.status_code == 201
+    assert with_project.json()["roles"] == [
+        {"role": "Member", "scope": "project", "project": "Website Relaunch"}
+    ]
+
+    # Rejected last: the failure rolls its transaction back, which would take
+    # the fixtures created alongside it in this test with it.
+    without = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(role_id=str(seeded_roles["member"].id)),
+        headers=headers,
+    )
+    assert without.status_code == 400
+
+
+async def test_the_address_must_be_free_within_the_organization(
+    api_client: httpx.AsyncClient, admin, seeded_roles: dict[str, Role], auth_headers
+) -> None:
+    headers = await auth_headers(admin)
+    payload = member_payload(role_id=str(seeded_roles["organization-admin"].id))
+
+    assert (
+        await api_client.post("/api/v1/users", json=payload, headers=headers)
+    ).status_code == 201
+    again = await api_client.post("/api/v1/users", json=payload, headers=headers)
+
+    assert again.status_code == 409
+
+
+async def test_a_member_cannot_create_people(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    project: Project,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
+) -> None:
+    ordinary = await make_user(
+        organization, "dara@acme.test", role=seeded_roles["member"], project_id=project.id
+    )
+
+    response = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(role_id=str(seeded_roles["member"].id)),
+        headers=await auth_headers(ordinary),
+    )
+
+    assert response.status_code == 403
+
+
+async def test_a_role_from_another_organization_is_not_found(
+    api_client: httpx.AsyncClient, db_session, admin, auth_headers
+) -> None:
+    other = Organization(name="Other Co", slug="other-co")
+    db_session.add(other)
+    await db_session.flush()
+    from app.services.rbac import list_roles, seed_default_roles
+
+    await seed_default_roles(db_session, other)
+    stranger = (await list_roles(db_session, other.id))[0]
+
+    response = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(role_id=str(stranger.id)),
+        headers=await auth_headers(admin),
+    )
+
+    assert response.status_code == 404
+
+
+async def test_members_are_listed_with_their_roles(
+    api_client: httpx.AsyncClient, admin, seeded_roles: dict[str, Role], auth_headers
+) -> None:
+    headers = await auth_headers(admin)
+    await api_client.post(
+        "/api/v1/users",
+        json=member_payload(role_id=str(seeded_roles["organization-admin"].id)),
+        headers=headers,
+    )
+
+    listed = await api_client.get("/api/v1/users", headers=headers)
+
+    assert listed.status_code == 200
+    people = listed.json()
+    assert {person["email"] for person in people} == {"ada@acme.test", "new.person@acme.test"}
+
+
+async def test_a_malformed_address_is_rejected(
+    api_client: httpx.AsyncClient, admin, seeded_roles: dict[str, Role], auth_headers
+) -> None:
+    response = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(email="not-an-address", role_id=str(seeded_roles["member"].id)),
+        headers=await auth_headers(admin),
+    )
+
+    assert response.status_code == 422
