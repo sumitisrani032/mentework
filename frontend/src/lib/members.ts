@@ -23,6 +23,36 @@ export type NewMember = {
   project_ids: number[];
 };
 
+/**
+ * Grant a role to someone who already has an account, on each project given.
+ *
+ * The API grants one project at a time, so several projects are several calls;
+ * the first failure is reported rather than swallowed, and the grants that
+ * already succeeded stand — refreshing shows exactly where it got to.
+ */
+export async function grantRole(
+  userId: number,
+  roleId: number,
+  projectIds: number[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  for (const projectId of projectIds.length > 0 ? projectIds : [null]) {
+    const response = await fetch(`/api/users/${userId}/roles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role_id: roleId, project_id: projectId }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      return {
+        ok: false,
+        error: describeError(payload) ?? `Could not grant this role (${response.status}).`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
 /** Create an account and grant it the role it was created for. */
 export async function createMember(
   input: NewMember,

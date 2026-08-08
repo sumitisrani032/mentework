@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { AssignRole } from "@/components/settings/assign-role";
 import { CreateMember } from "@/components/settings/create-member";
 import { Container } from "@/components/ui/section";
 import { fetchMembers } from "@/lib/members-server";
@@ -31,11 +32,17 @@ export default async function MembersPage() {
   const canCreate = session.permissions.some(
     (grant) => grant.feature === "members" && grant.can_create,
   );
+  // Granting a role is a change to the role assignments, which the API guards
+  // with the roles permission rather than members.
+  const canAssignRoles = session.permissions.some(
+    (grant) => grant.feature === "roles" && grant.can_edit,
+  );
+  const needsRoleList = canCreate || canAssignRoles;
 
   const [members, matrix, projects] = await Promise.all([
     fetchMembers(),
-    canCreate ? fetchRoleMatrix() : Promise.resolve(null),
-    canCreate ? fetchProjects() : Promise.resolve([]),
+    needsRoleList ? fetchRoleMatrix() : Promise.resolve(null),
+    needsRoleList ? fetchProjects() : Promise.resolve([]),
   ]);
 
   const roles = matrix?.status === "ok" ? matrix.matrix.roles : [];
@@ -87,19 +94,24 @@ export default async function MembersPage() {
                     <th scope="col" className="px-4 py-3 text-left font-semibold">
                       Roles
                     </th>
+                    {canAssignRoles && roles.length > 0 ? (
+                      <th scope="col" className="px-4 py-3 text-right font-semibold">
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
                   {members.map((member) => (
                     <tr key={member.id} className="border-b border-border last:border-b-0">
-                      <th scope="row" className="px-4 py-2.5 text-left font-medium">
+                      <th scope="row" className="px-4 py-2.5 text-left align-top font-medium">
                         {member.full_name}
                         {member.is_active ? null : (
                           <span className="ml-2 text-xs text-muted">deactivated</span>
                         )}
                       </th>
-                      <td className="px-4 py-2.5 text-muted">{member.email}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-2.5 align-top text-muted">{member.email}</td>
+                      <td className="px-4 py-2.5 align-top">
                         {member.roles.length === 0 ? (
                           <span className="text-muted">No role yet</span>
                         ) : (
@@ -118,6 +130,11 @@ export default async function MembersPage() {
                           </span>
                         )}
                       </td>
+                      {canAssignRoles && roles.length > 0 ? (
+                        <td className="px-4 py-2.5 text-right align-top">
+                          <AssignRole member={member} roles={roles} projects={projects} />
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
