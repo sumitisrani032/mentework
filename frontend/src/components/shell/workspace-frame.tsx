@@ -18,6 +18,11 @@ export function WorkspaceFrame({
   const canCreateProject = session.permissions.some(
     (grant) => grant.feature === "projects" && grant.can_create,
   );
+  // Same rule the left panel uses, so the two never disagree about who may
+  // reach the role matrix.
+  const canManageRoles = session.permissions.some(
+    (grant) => grant.feature === "roles" && grant.can_view,
+  );
 
   return (
     <div className="flex min-h-full flex-1">
@@ -25,6 +30,7 @@ export function WorkspaceFrame({
         fullName={session.user.full_name}
         organizationName={session.organization.name}
         canCreateProject={canCreateProject}
+        canManageRoles={canManageRoles}
       />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>

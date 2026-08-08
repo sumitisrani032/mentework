@@ -104,6 +104,15 @@ function KeyIcon({ className }: IconProps) {
   );
 }
 
+function ShieldIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
+      <path d="M12 3.5 19 6v6c0 4-3 7-7 8.5C8 19 5 16 5 12V6Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
 function PowerIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className} {...STROKE}>
@@ -162,10 +171,12 @@ export function IconRail({
   fullName,
   organizationName,
   canCreateProject,
+  canManageRoles,
 }: {
   fullName: string;
   organizationName: string;
   canCreateProject: boolean;
+  canManageRoles: boolean;
 }) {
   const pathname = usePathname();
 
@@ -197,7 +208,11 @@ export function IconRail({
           <RailButton key={item.key} label={item.label} icon={item.icon} />
         ))}
 
-        <AccountMenu fullName={fullName} organizationName={organizationName} />
+        <AccountMenu
+          fullName={fullName}
+          organizationName={organizationName}
+          canManageRoles={canManageRoles}
+        />
       </div>
     </aside>
   );
@@ -253,9 +268,11 @@ function RailButton({ label, icon: Icon }: { label: string; icon: (props: IconPr
 function AccountMenu({
   fullName,
   organizationName,
+  canManageRoles,
 }: {
   fullName: string;
   organizationName: string;
+  canManageRoles: boolean;
 }) {
   const menu = useRef<HTMLDetailsElement>(null);
 
@@ -313,6 +330,11 @@ function AccountMenu({
         <MenuLink href="/settings/profile#change-password" icon={KeyIcon} onNavigate={closeMenu}>
           Change password
         </MenuLink>
+        {canManageRoles ? (
+          <MenuLink href="/settings/roles" icon={ShieldIcon} onNavigate={closeMenu}>
+            Roles &amp; permissions
+          </MenuLink>
+        ) : null}
 
         <Divider />
 
