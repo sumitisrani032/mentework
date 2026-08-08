@@ -28,41 +28,24 @@ export type RoleMatrix = { features: FeatureRow[]; roles: Role[] };
 
 export type Organization = { id: number; name: string; slug: string; is_active: boolean };
 
+/** Why the matrix could not be shown, so the page can explain itself. */
+export type MatrixResult =
+  | { status: "ok"; matrix: RoleMatrix }
+  | { status: "unauthenticated" }
+  | { status: "forbidden" }
+  | { status: "unavailable" };
+
 /**
- * Read the first organization.
+ * Save a role's permissions.
  *
- * Stands in for "the organization the signed-in admin belongs to" until
- * authentication exists.
+ * Goes through this app's own route handler rather than straight to the API:
+ * the session lives in an httpOnly cookie that client code cannot read.
  */
-export async function fetchFirstOrganization(): Promise<Organization | null> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/organizations`, { cache: "no-store" });
-    if (!response.ok) return null;
-    const organizations = (await response.json()) as Organization[];
-    return organizations[0] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export async function fetchRoleMatrix(organizationId: string): Promise<RoleMatrix | null> {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/organizations/${organizationId}/roles`,
-      { cache: "no-store" },
-    );
-    if (!response.ok) return null;
-    return (await response.json()) as RoleMatrix;
-  } catch {
-    return null;
-  }
-}
-
 export async function saveRolePermissions(
   roleId: number,
   permissions: Permission[],
 ): Promise<Role> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/roles/${roleId}/permissions`, {
+  const response = await fetch(`/api/roles/${roleId}/permissions`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ permissions }),
@@ -75,7 +58,7 @@ export async function saveRolePermissions(
   return (await response.json()) as Role;
 }
 
-function describeError(detail: unknown): string | null {
+export function describeError(detail: unknown): string | null {
   if (detail && typeof detail === "object" && "detail" in detail) {
     const value = (detail as { detail: unknown }).detail;
     if (typeof value === "string") return value;

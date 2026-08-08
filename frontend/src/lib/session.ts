@@ -38,6 +38,25 @@ export async function fetchWorkspace(slug: string): Promise<Workspace | null> {
 }
 
 /**
+ * Call the API as the signed-in user.
+ *
+ * Server-side only: it reads the httpOnly session cookie, which client
+ * components cannot see. Anything the browser needs to trigger goes through a
+ * route handler that calls this.
+ */
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      ...init.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    cache: "no-store",
+  });
+}
+
+/**
  * Resolve the signed-in user from the session cookie.
  *
  * The token is verified by the API on every call rather than trusted locally,

@@ -127,10 +127,69 @@ How it works:
 placeholder is still set outside development. Generate one with
 `openssl rand -hex 32`.
 
-> **Still open:** the organisation and role endpoints have no authorisation
-> checks yet — any signed-in user, or none, can call them. They need to be
-> gated on the `roles` permission before this leaves a local machine. There is
-> also no rate limiting on sign-in.
+## Authorization
+
+Every endpoint outside sign-in requires a session **and** the matching
+permission from the role matrix. Nothing is keyed to a role's name — change the
+grid and access changes with it.
+
+| Endpoint                        | Requires                         |
+| ------------------------------- | -------------------------------- |
+| `GET /roles`                    | `roles` · view                   |
+| `POST /roles`                   | `roles` · create                 |
+| `PUT /roles/{id}/permissions`   | `roles` · edit                   |
+| `DELETE /roles/{id}`            | `roles` · delete                 |
+| `POST /users/{id}/roles`        | `roles` · edit                   |
+| `GET /organizations/me`         | any session                      |
+| `.../timesheets` (read)         | `timesheet` · view **in that project** |
+| `.../timesheets` (write)        | `timesheet` · create **in that project** |
+
+Two rules run through all of it:
+
+- **Organisation features cannot be unlocked by a project role.** A grant
+  scoped to one project never confers `roles`, `billing` or `settings`,
+  so being an admin of a single project does not hand over the organisation.
+- **Anything you may not see is reported as missing, not forbidden.** Another
+  tenant's role, project or organisation returns 404, so ids cannot be probed.
+
+There is deliberately **no route that lists or creates organisations** —
+enumerating tenants should be impossible, and provisioning is an operator
+action:
+
+```bash
+npm run org:create -- --name "Acme Design" --slug acme \
+    --admin-email ada@acme.example --admin-name "Ada Okonkwo"
+```
+
+The password is read from stdin, so it never reaches shell history.
+
+> **Still open:** no rate limiting on sign-in.
+
+## Timesheets
+
+A timesheet is a named bucket of time inside a project; time entries hang off
+it.
+
+```
+GET  /api/v1/projects/{project_id}/timesheets
+POST /api/v1/projects/{project_id}/timesheets
+GET  /api/v1/projects/{project_id}/timesheets/{timesheet_id}
+GET  /api/v1/projects/{project_id}/timesheets/{timesheet_id}/time
+POST /api/v1/projects/{project_id}/timesheets/{timesheet_id}/time
+```
+
+Two decisions worth knowing:
+
+- **Time is stored as a single minute total**, not as separate hours and
+  minutes. The API still speaks `logged_hours` / `logged_mins`, but "1h 90m"
+  can never be persisted, and summing is trivial. Minutes above 59 are rejected.
+- **Only the estimate is stored.** `logged_*`, `billable_*` and `billed_*` are
+  summed from the entries on read, so a timesheet's totals can never disagree
+  with the time logged against it.
+
+Private timesheets are visible only to their creator, their assignees, and
+anyone whose role can *delete* timesheets — otherwise an administrator could
+not audit time they did not log themselves.
 
 ### Theming
 
