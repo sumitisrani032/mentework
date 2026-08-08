@@ -35,6 +35,11 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# Alembic writes these; the long lines are rendered SQL that should not be
+# reflowed by hand.
+"alembic/versions/*" = ["E501"]
+
 [tool.ruff.lint.isort]
 # The local alembic/ migrations directory would otherwise shadow the installed
 # alembic package and be sorted as first-party.

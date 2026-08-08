@@ -7,6 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, IntPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.project import Project
+    from app.models.role import Role
     from app.models.user import User
 
 # Reserved subdomains that must never be handed to a tenant, because they are
@@ -77,6 +79,16 @@ class Organization(IntPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     users: Mapped[list["User"]] = relationship(
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    roles: Mapped[list["Role"]] = relationship(
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    projects: Mapped[list["Project"]] = relationship(
         back_populates="organization",
         cascade="all, delete-orphan",
         passive_deletes=True,
