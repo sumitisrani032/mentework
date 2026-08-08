@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
+from app.db.session import get_db
 from app.main import app
 from app.models.organization import Organization
 
@@ -16,6 +17,22 @@ async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as async_client:
         yield async_client
+
+
+@pytest.fixture
+async def api_client(db_session: AsyncSession) -> AsyncGenerator[httpx.AsyncClient, None]:
+    """A client whose requests run on the test's transaction.
+
+    Overriding get_db means anything a route commits is rolled back with the
+    rest of the test, so API tests share the development database safely.
+    """
+    app.dependency_overrides[get_db] = lambda: db_session
+    transport = httpx.ASGITransport(app=app)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as async_client:
+            yield async_client
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture
