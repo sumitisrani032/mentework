@@ -93,19 +93,20 @@ type RailItem = {
   href?: string;
   /** Sections that do not exist yet are shown dimmed rather than as dead links. */
   built: boolean;
-  /** Path prefix that lights the item up. */
-  match?: string;
+  /** Whether the current path belongs to this section. */
+  matches?: (pathname: string) => boolean;
 };
 
 const ITEMS: RailItem[] = [
-  { key: "me", label: "Me", icon: HomeIcon, href: "/dashboard", built: true, match: "/dashboard" },
+  // Me is the workspace root, so it matches that one path and nothing below it.
+  { key: "me", label: "Me", icon: HomeIcon, href: "/", built: true, matches: (path) => path === "/" },
   {
     key: "projects",
     label: "Projects",
     icon: FolderIcon,
     href: "/projects",
     built: true,
-    match: "/projects",
+    matches: (path) => path.startsWith("/projects"),
   },
   { key: "everything", label: "Everything", icon: GlobeIcon, built: false },
   { key: "chat", label: "Chat", icon: ChatIcon, built: false },
@@ -161,11 +162,7 @@ export function IconRail({
 
       <nav aria-label="Workspace" className="flex flex-col items-center gap-1">
         {ITEMS.map((item) => (
-          <RailEntry
-            key={item.key}
-            item={item}
-            active={item.match ? pathname.startsWith(item.match) : false}
-          />
+          <RailEntry key={item.key} item={item} active={item.matches?.(pathname) ?? false} />
         ))}
       </nav>
 

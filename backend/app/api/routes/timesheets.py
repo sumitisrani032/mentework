@@ -218,7 +218,7 @@ async def read_time_entries(
     authors = await _authors_of(db, entries)
 
     return [
-        _entry_to_read(
+        entry_to_read(
             entry,
             timesheet,
             project,
@@ -273,7 +273,7 @@ async def create_time_entry(
     await db.refresh(entry)
 
     totals = await service.totals_for(db, [timesheet.id])
-    return _entry_to_read(
+    return entry_to_read(
         entry, timesheet, project, totals[timesheet.id], current_user.id, current_user
     )
 
@@ -435,7 +435,7 @@ async def update_time_entry(
     await db.refresh(entry)
 
     totals = await service.totals_for(db, [timesheet.id])
-    return _entry_to_read(
+    return entry_to_read(
         entry, timesheet, project, totals[timesheet.id], current_user.id, current_user
     )
 
@@ -499,7 +499,7 @@ def _initials(full_name: str) -> str:
     return (parts[0][0] + (parts[-1][0] if len(parts) > 1 else "")).upper()
 
 
-def _entry_to_read(
+def entry_to_read(
     entry: TimeEntry,
     timesheet: Timesheet,
     project: Project,
@@ -507,6 +507,11 @@ def _entry_to_read(
     viewer_id: int,
     logged_by: User | None = None,
 ) -> TimeEntryRead:
+    """Serialise one entry with the timesheet and project it belongs to.
+
+    Public because the cross-project ``/me/time`` listing returns the same
+    shape: one entry should read identically wherever it is shown.
+    """
     logged_hours, logged_mins = divmod(entry.logged_minutes, 60)
     sheet_logged_hours, sheet_logged_mins = service.split_minutes(totals.logged)
     estimated_hours, estimated_mins = service.split_minutes(timesheet.estimated_minutes)

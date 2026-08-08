@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
+import { MeHome } from "@/components/home/me-home";
 import { Benefits } from "@/components/landing/benefits";
 import { Cta } from "@/components/landing/cta";
 import { Faq } from "@/components/landing/faq";
@@ -7,16 +8,32 @@ import { FeatureTabs } from "@/components/landing/feature-tabs";
 import { Hero } from "@/components/landing/hero";
 import { Solutions } from "@/components/landing/solutions";
 import { Testimonials } from "@/components/landing/testimonials";
+import { WorkspaceFrame } from "@/components/shell/workspace-frame";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getSession } from "@/lib/session";
 import { getTenantSlug } from "@/lib/tenant";
 
-export default async function Home() {
-  // Signed in on a workspace address: the marketing page is not what you came
-  // for — your projects are.
+/** The root is two different pages, so it needs two different titles. */
+export async function generateMetadata(): Promise<Metadata> {
   if ((await getTenantSlug()) && (await getSession())) {
-    redirect("/projects");
+    return { title: "Me — Mentework", robots: { index: false, follow: false } };
+  }
+  return {};
+}
+
+/**
+ * One address, two pages: the workspace root is your Me page once you are
+ * signed in, and the marketing site to everyone else.
+ */
+export default async function Home() {
+  const session = (await getTenantSlug()) ? await getSession() : null;
+  if (session) {
+    return (
+      <WorkspaceFrame session={session}>
+        <MeHome session={session} />
+      </WorkspaceFrame>
+    );
   }
 
   return (

@@ -45,7 +45,7 @@ export function AppShell({
     <div className="flex min-h-full flex-1">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface lg:flex">
         <div className="border-b border-border px-3 py-4">
-          <Link href="/dashboard" className="block px-2.5">
+          <Link href="/" className="block px-2.5">
             <Logo />
           </Link>
         </div>
