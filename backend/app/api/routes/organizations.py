@@ -1,62 +1,40 @@
 """Organization endpoints.
 
-NOTE: unauthenticated for now. Creating an organization will become part of
-signup, and listing must be restricted once auth exists.
+A tenant may only ever read itself. There is deliberately no route that lists
+organizations and none that creates one: provisioning a tenant is an operator
+action, not something reachable over the API. Use `npm run org:create`.
 """
 
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, status
 
-from app.db.session import get_db
+from app.api.deps import CurrentUser, DbSession
 from app.models.organization import Organization
-from app.schemas.organization import OrganizationCreate, OrganizationRead
-from app.services import rbac
+from app.schemas.organization import OrganizationRead
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
-DbSession = Annotated[AsyncSession, Depends(get_db)]
 
-
-@router.get("", response_model=list[OrganizationRead], summary="List organizations")
-async def read_organizations(db: DbSession) -> list[Organization]:
-    result = await db.execute(select(Organization).order_by(Organization.name))
-    return list(result.scalars().all())
-
-
-@router.post(
-    "",
-    response_model=OrganizationRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create an organization",
-)
-async def create_organization(payload: OrganizationCreate, db: DbSession) -> Organization:
-    """Create a tenant and seed its built-in roles.
-
-    Seeding happens in the same transaction, so an organization can never exist
-    without the roles its admins need to manage it.
-    """
-    organization = Organization(name=payload.name.strip(), slug=payload.slug)
-    db.add(organization)
-    try:
-        await db.flush()
-        await rbac.seed_default_roles(db, organization)
-        await db.commit()
-    except IntegrityError as exc:
-        await db.rollback()
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, f"The subdomain {payload.slug!r} is taken"
-        ) from exc
-
-    await db.refresh(organization)
+@router.get("/me", response_model=OrganizationRead, summary="Read your own organization")
+async def read_my_organization(current_user: CurrentUser, db: DbSession) -> Organization:
+    organization = await db.get(Organization, current_user.organization_id)
+    if organization is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organization not found")
     return organization
 
 
 @router.get("/{organization_id}", response_model=OrganizationRead, summary="Read an organization")
-async def read_organization(organization_id: int, db: DbSession) -> Organization:
+async def read_organization(
+    organization_id: int, current_user: CurrentUser, db: DbSession
+) -> Organization:
+    """Only the caller's own organization.
+
+    Another tenant's id is reported as missing rather than forbidden, so this
+    cannot be used to discover which organizations exist.
+    """
+    if organization_id != current_user.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organization not found")
+
     organization = await db.get(Organization, organization_id)
     if organization is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Organization not found")

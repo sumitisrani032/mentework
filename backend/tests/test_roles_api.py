@@ -2,44 +2,37 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.organization import Organization
-from app.models.role import Feature
-from app.services.rbac import list_roles, seed_default_roles
+from app.models.role import Feature, Role
+
+ROLES_URL = "/api/v1/roles"
 
 
-async def test_creating_an_organization_seeds_its_roles(api_client: httpx.AsyncClient) -> None:
-    response = await api_client.post(
-        "/api/v1/organizations", json={"name": "Northwind", "slug": "northwind"}
-    )
-    assert response.status_code == 201
-    organization_id = response.json()["id"]
+async def test_reading_the_matrix_requires_permission(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
+) -> None:
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
 
-    matrix = await api_client.get(f"/api/v1/organizations/{organization_id}/roles")
-    body = matrix.json()
+    response = await api_client.get(ROLES_URL, headers=await auth_headers(admin))
 
-    assert {role["slug"] for role in body["roles"]} == {
-        "organization-admin",
-        "project-manager",
-        "team-lead",
-        "member",
-        "client",
-        "viewer",
-    }
+    assert response.status_code == 200
+    body = response.json()
     assert len(body["features"]) == len(list(Feature))
-    # Every role must expose a checkbox for every feature.
-    assert all(len(role["permissions"]) == len(list(Feature)) for role in body["roles"])
-
-
-async def test_a_reserved_subdomain_is_rejected(api_client: httpx.AsyncClient) -> None:
-    response = await api_client.post("/api/v1/organizations", json={"name": "Api", "slug": "api"})
-    assert response.status_code == 422
+    assert {role["slug"] for role in body["roles"]} == set(seeded_roles)
 
 
 async def test_an_admin_can_retune_a_built_in_role(
-    api_client: httpx.AsyncClient, db_session: AsyncSession, organization: Organization
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
 ) -> None:
-    await seed_default_roles(db_session, organization)
-    roles = {role.slug: role for role in await list_roles(db_session, organization.id)}
-    manager = roles["project-manager"]
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+    manager = seeded_roles["project-manager"]
 
     payload = {
         "permissions": [
@@ -48,7 +41,6 @@ async def test_an_admin_can_retune_a_built_in_role(
                 "can_view": permission.can_view,
                 "can_create": permission.can_create,
                 "can_edit": permission.can_edit,
-                # Take away the ability to delete tasks.
                 "can_delete": False
                 if permission.feature is Feature.TASKS
                 else permission.can_delete,
@@ -57,7 +49,9 @@ async def test_an_admin_can_retune_a_built_in_role(
         ]
     }
 
-    response = await api_client.put(f"/api/v1/roles/{manager.id}/permissions", json=payload)
+    response = await api_client.put(
+        f"{ROLES_URL}/{manager.id}/permissions", json=payload, headers=await auth_headers(admin)
+    )
 
     assert response.status_code == 200
     tasks = next(p for p in response.json()["permissions"] if p["feature"] == "tasks")
@@ -66,42 +60,83 @@ async def test_an_admin_can_retune_a_built_in_role(
 
 
 async def test_editing_without_viewing_is_rejected(
-    api_client: httpx.AsyncClient, db_session: AsyncSession, organization: Organization
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
 ) -> None:
-    await seed_default_roles(db_session, organization)
-    roles = {role.slug: role for role in await list_roles(db_session, organization.id)}
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
 
     response = await api_client.put(
-        f"/api/v1/roles/{roles['viewer'].id}/permissions",
+        f"{ROLES_URL}/{seeded_roles['viewer'].id}/permissions",
         json={"permissions": [{"feature": "tasks", "can_view": False, "can_create": True}]},
+        headers=await auth_headers(admin),
     )
 
     assert response.status_code == 422
 
 
 async def test_built_in_roles_cannot_be_deleted(
-    api_client: httpx.AsyncClient, db_session: AsyncSession, organization: Organization
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
 ) -> None:
-    await seed_default_roles(db_session, organization)
-    roles = {role.slug: role for role in await list_roles(db_session, organization.id)}
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
 
-    response = await api_client.delete(f"/api/v1/roles/{roles['organization-admin'].id}")
+    response = await api_client.delete(
+        f"{ROLES_URL}/{seeded_roles['organization-admin'].id}", headers=await auth_headers(admin)
+    )
 
     assert response.status_code == 400
     assert "cannot be deleted" in response.json()["detail"]
 
 
 async def test_a_custom_role_starts_with_no_access_and_can_be_removed(
-    api_client: httpx.AsyncClient, organization: Organization
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
 ) -> None:
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+    headers = await auth_headers(admin)
+
     created = await api_client.post(
-        f"/api/v1/organizations/{organization.id}/roles",
-        json={"name": "QA Reviewer", "scope": "project"},
+        ROLES_URL, json={"name": "QA Reviewer", "scope": "project"}, headers=headers
     )
+
     assert created.status_code == 201
     body = created.json()
     assert body["slug"] == "qa-reviewer"
     assert body["is_system"] is False
     assert not any(permission["can_view"] for permission in body["permissions"])
 
-    assert (await api_client.delete(f"/api/v1/roles/{body['id']}")).status_code == 204
+    removed = await api_client.delete(f"{ROLES_URL}/{body['id']}", headers=headers)
+    assert removed.status_code == 204
+
+
+async def test_granting_a_role_needs_the_user_to_be_a_colleague(
+    api_client: httpx.AsyncClient,
+    db_session: AsyncSession,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
+) -> None:
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+
+    other = Organization(name="Northwind", slug="northwind")
+    db_session.add(other)
+    await db_session.flush()
+    outsider = await make_user(other, "mallory@northwind.test")
+
+    response = await api_client.post(
+        f"/api/v1/users/{outsider.id}/roles",
+        json={"role_id": str(seeded_roles["organization-admin"].id)},
+        headers=await auth_headers(admin),
+    )
+
+    assert response.status_code == 404

@@ -6,9 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
+from app.core.security import create_access_token
 from app.db.session import get_db
 from app.main import app
 from app.models.organization import Organization
+from app.models.project import Project
+from app.models.role import Role
+from app.models.user import User
+from app.services.rbac import assign_role, list_roles, seed_default_roles
 
 
 @pytest.fixture
@@ -81,3 +86,58 @@ async def organization(db_session: AsyncSession) -> Organization:
     db_session.add(org)
     await db_session.flush()
     return org
+
+
+@pytest.fixture
+async def seeded_roles(db_session: AsyncSession, organization: Organization) -> dict[str, Role]:
+    """The six built-in roles for the test organization, keyed by slug."""
+    await seed_default_roles(db_session, organization)
+    return {role.slug: role for role in await list_roles(db_session, organization.id)}
+
+
+@pytest.fixture
+async def project(db_session: AsyncSession, organization: Organization) -> Project:
+    item = Project(organization_id=organization.id, name="Website Relaunch", key="WEB")
+    db_session.add(item)
+    await db_session.flush()
+    return item
+
+
+@pytest.fixture
+def make_user(db_session: AsyncSession):
+    """Create a user, optionally granting them a role."""
+
+    async def _make(
+        organization: Organization,
+        email: str,
+        *,
+        role: Role | None = None,
+        project_id: int | None = None,
+    ) -> User:
+        user = User(
+            organization_id=organization.id,
+            email=email,
+            full_name=email.split("@")[0].title(),
+        )
+        db_session.add(user)
+        await db_session.flush()
+        if role is not None:
+            await assign_role(db_session, user_id=user.id, role=role, project_id=project_id)
+        return user
+
+    return _make
+
+
+@pytest.fixture
+def auth_headers(db_session: AsyncSession):
+    """Bearer headers for a user, as if they had just signed in."""
+
+    async def _headers(user: User) -> dict[str, str]:
+        organization = await db_session.get(Organization, user.organization_id)
+        assert organization is not None
+        token = create_access_token(
+            user_id=user.id, organization_id=organization.id, slug=organization.slug
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    return _headers

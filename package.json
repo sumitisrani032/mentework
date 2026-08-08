@@ -24,7 +24,8 @@
     "db:down": "docker compose down",
     "db:migrate": "cd backend && .venv/bin/alembic upgrade head",
     "db:revision": "cd backend && .venv/bin/alembic revision --autogenerate -m",
-    "db:seed": "cd backend && .venv/bin/python -m scripts.seed_demo"
+    "db:seed": "cd backend && .venv/bin/python -m scripts.seed_demo",
+    "org:create": "cd backend && .venv/bin/python -m scripts.create_organization"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
