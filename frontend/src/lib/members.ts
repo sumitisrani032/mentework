@@ -19,7 +19,8 @@ export type NewMember = {
   full_name: string;
   password: string;
   role_id: number;
-  project_id: number | null;
+  /** One grant per project. Empty for an organisation-wide role. */
+  project_ids: number[];
 };
 
 /** Create an account and grant it the role it was created for. */

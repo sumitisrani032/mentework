@@ -28,7 +28,7 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [roleId, setRoleId] = useState(roles[0]?.id ?? 0);
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
+  const [projectIds, setProjectIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -41,7 +41,14 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
     setEmail("");
     setFullName("");
     setPassword("");
+    setProjectIds([]);
     setError(null);
+  }
+
+  function toggleProject(id: number) {
+    setProjectIds((current) =>
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
+    );
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -55,7 +62,7 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
       full_name: fullName.trim(),
       password,
       role_id: roleId,
-      project_id: needsProject ? projectId : null,
+      project_ids: needsProject ? projectIds : [],
     });
 
     setPending(false);
@@ -139,24 +146,29 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
         </label>
 
         {needsProject ? (
-          <label className="text-sm font-medium">
-            Project
-            <select
-              required
-              value={projectId}
-              onChange={(event) => setProjectId(event.target.value)}
-              className={FIELD_CLASS}
-            >
+          <fieldset>
+            <legend className="text-sm font-medium">Projects</legend>
+            <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border bg-background p-2">
               {projects.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
+                <label
+                  key={option.id}
+                  className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-surface-strong"
+                >
+                  <input
+                    type="checkbox"
+                    checked={projectIds.includes(option.id)}
+                    onChange={() => toggleProject(option.id)}
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  <span className="font-mono text-xs text-muted">{option.key}</span>
+                  <span className="truncate">{option.name}</span>
+                </label>
               ))}
-            </select>
-            <span className="mt-1 block text-xs font-normal text-muted">
-              A project role applies inside that project only.
+            </div>
+            <span className="mt-1 block text-xs text-muted">
+              This role applies inside each project you pick. Choose as many as they work on.
             </span>
-          </label>
+          </fieldset>
         ) : null}
       </div>
 
@@ -199,7 +211,7 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
             pending ||
             roleId === 0 ||
             password.length < MIN_PASSWORD ||
-            (needsProject && projectId === "")
+            (needsProject && projectIds.length === 0)
           }
           className={buttonClass("primary", "sm")}
         >
