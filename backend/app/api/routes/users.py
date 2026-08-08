@@ -83,8 +83,11 @@ async def create_member(
     payload: MemberCreate, current_user: CanCreateMembers, db: DbSession
 ) -> MemberRead:
     role = await _own_role(db, payload.role_id, current_user)
-    if payload.project_id is not None:
-        await _own_project(db, payload.project_id, current_user)
+    # Deduplicated: the same project twice would collide on the uniqueness
+    # constraint over (user, role, project) and read as a server error.
+    project_ids = list(dict.fromkeys(payload.project_ids))
+    for project_id in project_ids:
+        await _own_project(db, project_id, current_user)
 
     user = User(
         organization_id=current_user.organization_id,
@@ -105,8 +108,11 @@ async def create_member(
             f"Someone with the address {payload.email!r} is already in this workspace.",
         ) from exc
 
+    # No projects means one organization-wide grant; the scope check inside
+    # assign_role rejects whichever of the two does not match the role.
     try:
-        await rbac.assign_role(db, user_id=user.id, role=role, project_id=payload.project_id)
+        for project_id in project_ids or [None]:
+            await rbac.assign_role(db, user_id=user.id, role=role, project_id=project_id)
     except rbac.RbacError as exc:
         await db.rollback()
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

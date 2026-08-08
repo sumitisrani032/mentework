@@ -28,8 +28,10 @@ class MemberCreate(BaseModel):
     # emailed yet, so there is nowhere else for it to come from.
     password: str = Field(min_length=8, max_length=256)
     role_id: int
-    # Required for a project-scoped role, rejected for an organization-wide one.
-    project_id: int | None = None
+    # A project-scoped role can cover several projects at once — someone is
+    # rarely on exactly one. One grant is written per project. Required for a
+    # project-scoped role, rejected for an organization-wide one.
+    project_ids: list[int] = Field(default_factory=list)
 
     @field_validator("email")
     @classmethod

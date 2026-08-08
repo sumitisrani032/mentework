@@ -81,7 +81,7 @@ async def test_a_project_role_needs_a_project(
         json=member_payload(
             email="dara@acme.test",
             role_id=str(seeded_roles["member"].id),
-            project_id=str(project.id),
+            project_ids=[str(project.id)],
         ),
         headers=headers,
     )
@@ -98,6 +98,75 @@ async def test_a_project_role_needs_a_project(
         headers=headers,
     )
     assert without.status_code == 400
+
+
+async def test_one_role_can_cover_several_projects(
+    api_client: httpx.AsyncClient,
+    db_session,
+    organization: Organization,
+    project: Project,
+    admin,
+    seeded_roles: dict[str, Role],
+    auth_headers,
+) -> None:
+    """Someone is rarely on exactly one project, so the role is granted on each."""
+    second = Project(organization_id=organization.id, name="Mobile App", key="MOB")
+    db_session.add(second)
+    await db_session.flush()
+
+    response = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(
+            role_id=str(seeded_roles["member"].id),
+            project_ids=[str(project.id), str(second.id)],
+        ),
+        headers=await auth_headers(admin),
+    )
+
+    assert response.status_code == 201
+    assert {grant["project"] for grant in response.json()["roles"]} == {
+        "Website Relaunch",
+        "Mobile App",
+    }
+
+
+async def test_the_same_project_twice_is_not_an_error(
+    api_client: httpx.AsyncClient,
+    project: Project,
+    admin,
+    seeded_roles: dict[str, Role],
+    auth_headers,
+) -> None:
+    response = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(
+            role_id=str(seeded_roles["member"].id),
+            project_ids=[str(project.id), str(project.id)],
+        ),
+        headers=await auth_headers(admin),
+    )
+
+    assert response.status_code == 201
+    assert len(response.json()["roles"]) == 1
+
+
+async def test_an_organization_role_cannot_name_projects(
+    api_client: httpx.AsyncClient,
+    project: Project,
+    admin,
+    seeded_roles: dict[str, Role],
+    auth_headers,
+) -> None:
+    response = await api_client.post(
+        "/api/v1/users",
+        json=member_payload(
+            role_id=str(seeded_roles["organization-admin"].id),
+            project_ids=[str(project.id)],
+        ),
+        headers=await auth_headers(admin),
+    )
+
+    assert response.status_code == 400
 
 
 async def test_the_address_must_be_free_within_the_organization(
