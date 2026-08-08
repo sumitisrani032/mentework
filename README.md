@@ -193,9 +193,13 @@ not audit time they did not log themselves.
 
 ### Bulk upload
 
-Anyone who can log time can upload a month at once as CSV, from
-**`/timesheets`** — pick a project and timesheet, drop the file in, check the
-preview, then commit. Four columns:
+**`/timesheets`** lists the projects you can see, the timesheets in each, and
+the time already logged against the selected one. "New timesheet" creates one;
+the upload panel takes a whole month at once. Both appear only if your role can
+create timesheets *in that project* — the page asks
+`GET /projects/{id}/permissions` rather than offering buttons that would 403.
+
+Four columns:
 
 ```csv
 date,logged_hours,description,status

@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Project, Timesheet } from "@/lib/timesheets";
+import type { Project, ProjectPermissions, TimeEntry, Timesheet } from "@/lib/timesheets";
 import { apiFetch } from "@/lib/session";
 
 /** Projects the signed-in user may see. Empty when they have none. */
@@ -27,5 +27,32 @@ export async function fetchTimesheets(projectId: number): Promise<Timesheet[] | 
     return (await response.json()) as Timesheet[];
   } catch {
     return null;
+  }
+}
+
+/** What the signed-in user may do in this project, so the UI can hide the rest. */
+export async function fetchProjectPermissions(projectId: number): Promise<ProjectPermissions> {
+  try {
+    const response = await apiFetch(`/api/v1/projects/${projectId}/permissions`);
+    if (!response.ok) return {};
+    return (await response.json()) as ProjectPermissions;
+  } catch {
+    return {};
+  }
+}
+
+/** The time already logged against a timesheet, oldest first. */
+export async function fetchTimeEntries(
+  projectId: number,
+  timesheetId: number,
+): Promise<TimeEntry[]> {
+  try {
+    const response = await apiFetch(
+      `/api/v1/projects/${projectId}/timesheets/${timesheetId}/time`,
+    );
+    if (!response.ok) return [];
+    return (await response.json()) as TimeEntry[];
+  } catch {
+    return [];
   }
 }

@@ -4,11 +4,19 @@ import { redirect } from "next/navigation";
 
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CreateTimesheet } from "@/components/timesheets/create-timesheet";
+import { EntriesTable } from "@/components/timesheets/entries-table";
 import { ImportPanel } from "@/components/timesheets/import-panel";
 import { Container } from "@/components/ui/section";
 import { getSession } from "@/lib/session";
-import { formatDuration } from "@/lib/timesheets";
-import { fetchProjects, fetchTimesheets } from "@/lib/timesheets-server";
+import type { ProjectPermissions, Timesheet } from "@/lib/timesheets";
+import { NO_PERMISSION, formatDuration } from "@/lib/timesheets";
+import {
+  fetchProjectPermissions,
+  fetchProjects,
+  fetchTimeEntries,
+  fetchTimesheets,
+} from "@/lib/timesheets-server";
 
 export const metadata: Metadata = {
   title: "Timesheets — Mentework",
@@ -37,11 +45,19 @@ export default async function TimesheetsPage({
   const { project: projectParam, timesheet: timesheetParam } = await searchParams;
   const projects = await fetchProjects();
   const project = projects.find((item) => item.id === projectParam) ?? projects[0];
-  const timesheets = project ? await fetchTimesheets(project.id) : null;
+
+  const [timesheets, permissions]: [Timesheet[] | null, ProjectPermissions] = project
+    ? await Promise.all([fetchTimesheets(project.id), fetchProjectPermissions(project.id)])
+    : [null, {}];
+
+  const canLogTime = (permissions.timesheet ?? NO_PERMISSION).create;
+
   const selected =
     timesheets?.find((item) => item.id === Number(timesheetParam)) ??
     timesheets?.find((item) => !item.archived) ??
     null;
+
+  const entries = selected && project ? await fetchTimeEntries(project.id, selected.id) : [];
 
   return (
     <>
@@ -61,8 +77,15 @@ export default async function TimesheetsPage({
 
       <main className="flex-1">
         <Container className="py-12">
-          <h1 className="text-3xl font-semibold tracking-tight">Timesheets</h1>
-          <p className="mt-2 text-muted">Log time as you go, or upload a whole month at once.</p>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">Timesheets</h1>
+              <p className="mt-2 text-muted">
+                Log time as you go, or upload a whole month at once.
+              </p>
+            </div>
+            {project && canLogTime ? <CreateTimesheet projectId={project.id} /> : null}
+          </div>
 
           {projects.length === 0 ? (
             <div className="mt-8">
@@ -102,7 +125,9 @@ export default async function TimesheetsPage({
                   </Notice>
                 ) : timesheets.length === 0 ? (
                   <Notice title="No timesheets in this project">
-                    Create one before logging time against it.
+                    {canLogTime
+                      ? "Create one with the button above, then log time against it."
+                      : "Ask someone who can manage timesheets to create one."}
                   </Notice>
                 ) : (
                   <div className="grid gap-8 lg:grid-cols-[20rem_1fr]">
@@ -126,6 +151,7 @@ export default async function TimesheetsPage({
                               {item.estimated_hours !== null
                                 ? ` of ${formatDuration(item.estimated_hours, item.estimated_mins)}`
                                 : ""}
+                              {item.private ? " · private" : ""}
                               {item.archived ? " · archived" : ""}
                             </span>
                           </Link>
@@ -133,18 +159,27 @@ export default async function TimesheetsPage({
                       })}
                     </nav>
 
-                    <div className="min-w-0">
+                    <div className="min-w-0 space-y-8">
                       {selected ? (
-                        selected.archived ? (
-                          <Notice title="This timesheet is archived">
-                            Archived timesheets cannot take new time. Pick another one.
-                          </Notice>
-                        ) : (
-                          <ImportPanel projectId={project!.id} timesheet={selected} />
-                        )
+                        <>
+                          {selected.archived ? (
+                            <Notice title="This timesheet is archived">
+                              Archived timesheets cannot take new time.
+                            </Notice>
+                          ) : canLogTime ? (
+                            <ImportPanel projectId={project!.id} timesheet={selected} />
+                          ) : (
+                            <Notice title="You can view this timesheet but not add to it">
+                              Logging time needs the <code className="font-mono">timesheet</code>{" "}
+                              create permission.
+                            </Notice>
+                          )}
+
+                          <EntriesTable entries={entries} />
+                        </>
                       ) : (
                         <Notice title="Select a timesheet">
-                          Choose one on the left to upload time against it.
+                          Choose one on the left to see the time logged against it.
                         </Notice>
                       )}
                     </div>
