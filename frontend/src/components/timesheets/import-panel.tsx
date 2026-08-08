@@ -29,9 +29,12 @@ const STATUS_LABEL: Record<string, string> = {
 export function ImportPanel({
   projectId,
   timesheet,
+  // Inside a dialog the surrounding card and heading are already provided.
+  bare = false,
 }: {
   projectId: number;
   timesheet: Timesheet;
+  bare?: boolean;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,11 +71,11 @@ export function ImportPanel({
   const busy = stage.name === "checking" || stage.name === "importing";
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className={bare ? "" : "rounded-xl border border-border bg-surface p-5"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-medium">Upload a month of time</h3>
-          <p className="mt-1 text-sm text-muted">
+          {bare ? null : <h3 className="font-medium">Upload a month of time</h3>}
+          <p className={`text-sm text-muted ${bare ? "" : "mt-1"}`}>
             A CSV with <code className="font-mono text-xs">date</code>,{" "}
             <code className="font-mono text-xs">logged_hours</code>,{" "}
             <code className="font-mono text-xs">description</code> and{" "}

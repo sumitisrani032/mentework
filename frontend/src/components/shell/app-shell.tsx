@@ -3,10 +3,11 @@ import Link from "next/link";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Logo } from "@/components/logo";
 import { ProjectSwitcher } from "@/components/shell/project-switcher";
+import { TimeNav } from "@/components/shell/time-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { isVisible, organizationNav, projectNav } from "@/lib/navigation";
 import type { Session } from "@/lib/session";
-import type { Project, ProjectPermissions } from "@/lib/timesheets";
+import type { Project, ProjectPermissions, Timesheet } from "@/lib/timesheets";
 
 /**
  * The application frame: a left panel of project sections beside the page.
@@ -21,6 +22,8 @@ export function AppShell({
   permissions,
   organizationPermissions,
   active,
+  timesheets = [],
+  activeTimesheetId = null,
   children,
 }: {
   session: Session;
@@ -29,6 +32,8 @@ export function AppShell({
   permissions: ProjectPermissions;
   organizationPermissions: ProjectPermissions;
   active: string;
+  timesheets?: Timesheet[];
+  activeTimesheetId?: number | null;
   children: React.ReactNode;
 }) {
   const projectItems = project
@@ -56,11 +61,22 @@ export function AppShell({
         <nav aria-label="Project" className="flex-1 overflow-y-auto p-3">
           {projectItems.length > 0 ? (
             <ul className="space-y-0.5">
-              {projectItems.map((item) => (
-                <li key={item.key}>
-                  <NavLink item={item} active={active === item.key} />
-                </li>
-              ))}
+              {projectItems.map((item) =>
+                item.key === "time" && project ? (
+                  <li key={item.key}>
+                    <TimeNav
+                      projectId={project.id}
+                      timesheets={timesheets}
+                      activeTimesheetId={activeTimesheetId}
+                      active={active === "time"}
+                    />
+                  </li>
+                ) : (
+                  <li key={item.key}>
+                    <NavLink item={item} active={active === item.key} />
+                  </li>
+                ),
+              )}
             </ul>
           ) : (
             <p className="px-2.5 text-sm text-muted">No project sections available to you.</p>

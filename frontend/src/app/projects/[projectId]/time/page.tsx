@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AppShell } from "@/components/shell/app-shell";
 import { CreateTimesheet } from "@/components/timesheets/create-timesheet";
 import { EntriesTable } from "@/components/timesheets/entries-table";
-import { ImportPanel } from "@/components/timesheets/import-panel";
+import { AddTimeDialog } from "@/components/timesheets/add-time-dialog";
+import { ImportDialog } from "@/components/timesheets/import-dialog";
 import { SummaryPanel } from "@/components/timesheets/summary-panel";
 import { getSession, organizationPermissions } from "@/lib/session";
 import { NO_PERMISSION, formatDuration } from "@/lib/timesheets";
@@ -73,6 +73,8 @@ export default async function ProjectTimePage({
       permissions={permissions}
       organizationPermissions={organizationPermissions(session)}
       active="time"
+      timesheets={timesheets ?? []}
+      activeTimesheetId={selected?.id ?? null}
     >
       <header className="border-b border-border px-6 py-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -87,28 +89,21 @@ export default async function ProjectTimePage({
                 : ""}
             </p>
           </div>
-          {canLogTime ? <CreateTimesheet projectId={project.id} /> : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {canLogTime && selected && !selected.archived ? (
+              <>
+                <AddTimeDialog
+                  projectId={project.id}
+                  timesheets={timesheets ?? []}
+                  selectedId={selected.id}
+                />
+                <ImportDialog projectId={project.id} timesheet={selected} />
+              </>
+            ) : null}
+            {canLogTime ? <CreateTimesheet projectId={project.id} /> : null}
+          </div>
         </div>
 
-        {timesheets && timesheets.length > 1 ? (
-          <nav aria-label="Timesheets" className="mt-4 flex flex-wrap gap-2">
-            {timesheets.map((item) => (
-              <Link
-                key={item.id}
-                href={`/projects/${project.id}/time?timesheet=${item.id}`}
-                aria-current={item.id === selected?.id}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                  item.id === selected?.id
-                    ? "border-primary/50 bg-primary/10 font-medium"
-                    : "border-border text-muted hover:bg-surface hover:text-foreground"
-                }`}
-              >
-                {item.title}
-                {item.archived ? " · archived" : ""}
-              </Link>
-            ))}
-          </nav>
-        ) : null}
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
@@ -132,8 +127,6 @@ export default async function ProjectTimePage({
                 <Notice title="This timesheet is archived">
                   Archived timesheets cannot take new time.
                 </Notice>
-              ) : canLogTime ? (
-                <ImportPanel projectId={project.id} timesheet={selected} />
               ) : null}
 
               <EntriesTable

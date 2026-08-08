@@ -9,7 +9,9 @@ import {
   type FeaturePermission,
   type TimeEntry,
   deleteTimeEntry,
+  formatDateHeading,
   formatDuration,
+  groupByDate,
   totalDuration,
   updateTimeEntry,
 } from "@/lib/timesheets";
@@ -94,9 +96,6 @@ export function EntriesTable({
                 Logged by
               </th>
               <th scope="col" className="px-4 py-3 text-left font-semibold">
-                Date
-              </th>
-              <th scope="col" className="px-4 py-3 text-left font-semibold">
                 Time
               </th>
               <th scope="col" className="px-4 py-3 text-left font-semibold">
@@ -110,8 +109,24 @@ export function EntriesTable({
               </th>
             </tr>
           </thead>
-          <tbody>
-            {entries.map((entry) => {
+          {groupByDate(entries).map((day) => (
+            <tbody key={day.date}>
+              <tr className="border-b border-border bg-surface/60">
+                <th
+                  scope="colgroup"
+                  colSpan={4}
+                  className="px-4 py-2 text-left text-xs font-semibold tracking-wide uppercase"
+                >
+                  {formatDateHeading(day.date)}
+                </th>
+                <td className="px-4 py-2 text-right text-xs text-muted">
+                  {formatDuration(
+                    totalDuration(day.entries).hours,
+                    totalDuration(day.entries).mins,
+                  )}
+                </td>
+              </tr>
+              {day.entries.map((entry) => {
               const mine = entry.by_me;
               const mayChange = permission.edit && (mine || canManageOthers);
               const mayRemove = permission.delete;
@@ -146,9 +161,10 @@ export function EntriesTable({
                   onCancelDelete={() => setConfirming(null)}
                   onError={setError}
                 />
-              );
-            })}
-          </tbody>
+                );
+              })}
+            </tbody>
+          ))}
         </table>
       </div>
     </section>
@@ -205,7 +221,6 @@ function ReadRow({
           </span>
         </span>
       </td>
-      <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap">{entry.date}</td>
       <td className="px-4 py-2.5 whitespace-nowrap">
         {formatDuration(entry.logged_hours, entry.logged_mins)}
         {entry.timer ? (
@@ -312,7 +327,7 @@ function EditRow({
   // pushing the buttons out of view.
   return (
     <tr className="border-b border-border bg-surface last:border-b-0">
-      <td colSpan={6} className="px-4 py-3">
+      <td colSpan={5} className="px-4 py-3">
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-xs text-muted">
             Date

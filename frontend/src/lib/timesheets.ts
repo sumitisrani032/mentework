@@ -128,6 +128,35 @@ export function formatDuration(hours: number | null, mins: number | null): strin
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
+/**
+ * Render a yyyy-mm-dd date as a readable heading.
+ *
+ * Formatted in UTC: the string has no timezone, and letting the browser assume
+ * local time shifts it to the previous day for anyone west of Greenwich.
+ */
+export function formatDateHeading(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** Group entries under their date, newest first, preserving order within a day. */
+export function groupByDate(entries: TimeEntry[]): { date: string; entries: TimeEntry[] }[] {
+  const byDate = new Map<string, TimeEntry[]>();
+  for (const entry of entries) {
+    const bucket = byDate.get(entry.date);
+    if (bucket) bucket.push(entry);
+    else byDate.set(entry.date, [entry]);
+  }
+  return [...byDate.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, group]) => ({ date, entries: group }));
+}
+
 /** Sum a list of entries into an hours/minutes pair. */
 export function totalDuration(entries: TimeEntry[]): { hours: number; mins: number } {
   const minutes = entries.reduce(
@@ -135,6 +164,31 @@ export function totalDuration(entries: TimeEntry[]): { hours: number; mins: numb
     0,
   );
   return { hours: Math.floor(minutes / 60), mins: minutes % 60 };
+}
+
+export type NewTimeEntry = {
+  date: string;
+  logged_hours: number;
+  logged_mins: number;
+  status: string;
+  description: string | null;
+};
+
+/** Log one entry against a timesheet. */
+export async function createTimeEntry(
+  projectId: number,
+  timesheetId: number,
+  entry: NewTimeEntry,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const response = await fetch(`/api/projects/${projectId}/timesheets/${timesheetId}/time`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  });
+  if (response.ok) return { ok: true };
+
+  const payload = await response.json().catch(() => null);
+  return { ok: false, error: describeError(payload) ?? `Could not add time (${response.status}).` };
 }
 
 export type TimeEntryPatch = {
