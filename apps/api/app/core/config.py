@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     project_name: str = "Mentework API"
     api_v1_prefix: str = "/api/v1"
     environment: str = "development"
-    database_url: str = "postgresql+asyncpg://mentework:mentework@localhost:5432/mentework"
+    database_url: str = "postgresql+asyncpg://mentework:mentework@localhost:5433/mentework"
     # Comma-separated so it can be set from a plain shell environment variable.
     cors_origins: str = "http://localhost:3000"
 
