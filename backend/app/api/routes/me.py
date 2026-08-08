@@ -6,20 +6,57 @@ per project, so they sit outside the project-scoped routers.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
 from app.api.routes.timesheets import entry_to_read
+from app.core.security import hash_password, verify_password
 from app.models.project import Project
 from app.models.role import Feature
 from app.models.timesheet import TimeEntry, Timesheet
+from app.schemas.auth import AuthenticatedUser, PasswordChange, ProfileUpdate
 from app.schemas.timesheet import TimeEntryRead
 from app.services import timesheets as service
 from app.services.rbac import accessible_project_ids, effective_permissions
 
 router = APIRouter(prefix="/me", tags=["me"])
+
+
+@router.patch("/profile", response_model=AuthenticatedUser, summary="Change your own details")
+async def update_my_profile(
+    payload: ProfileUpdate, current_user: CurrentUser, db: DbSession
+) -> AuthenticatedUser:
+    current_user.full_name = payload.full_name.strip()
+    await db.commit()
+    return AuthenticatedUser.model_validate(current_user)
+
+
+@router.post(
+    "/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Change your own password",
+)
+async def change_my_password(
+    payload: PasswordChange, current_user: CurrentUser, db: DbSession
+) -> Response:
+    """Replace the caller's password, proving they know the current one.
+
+    Requiring the current password means a walked-up-to session cannot be used
+    to lock the owner out of their own account.
+    """
+    valid, _ = verify_password(payload.current_password, current_user.hashed_password)
+    if not valid:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Your current password is not correct.")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "The new password must differ from the current one."
+        )
+
+    current_user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

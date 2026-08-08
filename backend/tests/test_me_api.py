@@ -4,6 +4,7 @@ import httpx
 import pytest
 from sqlalchemy import delete
 
+from app.core.security import hash_password
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.role import Role
@@ -154,3 +155,102 @@ async def test_the_limit_caps_the_listing(
 
 async def test_signed_out_callers_are_rejected(api_client: httpx.AsyncClient) -> None:
     assert (await api_client.get("/api/v1/me/time")).status_code == 401
+
+
+async def test_you_can_rename_yourself(
+    api_client: httpx.AsyncClient, organization: Organization, make_user, auth_headers
+) -> None:
+    user = await make_user(organization, "dara@acme.test")
+    headers = await auth_headers(user)
+
+    response = await api_client.patch(
+        "/api/v1/me/profile", json={"full_name": "  Dara Nwosu  "}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert response.json()["full_name"] == "Dara Nwosu"
+    assert (await api_client.get("/api/v1/auth/me", headers=headers)).json()["user"][
+        "full_name"
+    ] == "Dara Nwosu"
+
+
+async def test_your_email_is_not_yours_to_change(
+    api_client: httpx.AsyncClient, organization: Organization, make_user, auth_headers
+) -> None:
+    """The address identifies the account, so the endpoint simply ignores it."""
+    user = await make_user(organization, "dara@acme.test")
+    headers = await auth_headers(user)
+
+    response = await api_client.patch(
+        "/api/v1/me/profile",
+        json={"full_name": "Dara", "email": "someone.else@acme.test"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "dara@acme.test"
+
+
+async def test_changing_your_password_needs_the_current_one(
+    api_client: httpx.AsyncClient,
+    db_session,
+    organization: Organization,
+    make_user,
+    auth_headers,
+) -> None:
+    user: User = await make_user(organization, "dara@acme.test")
+    user.hashed_password = hash_password("mentework")
+    await db_session.flush()
+    headers = await auth_headers(user)
+
+    wrong = await api_client.post(
+        "/api/v1/me/password",
+        json={"current_password": "not-it", "new_password": "a-longer-secret"},
+        headers=headers,
+    )
+    assert wrong.status_code == 400
+
+    changed = await api_client.post(
+        "/api/v1/me/password",
+        json={"current_password": "mentework", "new_password": "a-longer-secret"},
+        headers=headers,
+    )
+    assert changed.status_code == 204
+
+    # The new password is the one that signs in now.
+    signed_in = await api_client.post(
+        "/api/v1/auth/login",
+        json={
+            "organization_slug": organization.slug,
+            "email": "dara@acme.test",
+            "password": "a-longer-secret",
+        },
+    )
+    assert signed_in.status_code == 200
+
+
+async def test_a_new_password_must_be_long_enough_and_different(
+    api_client: httpx.AsyncClient,
+    db_session,
+    organization: Organization,
+    make_user,
+    auth_headers,
+) -> None:
+    user: User = await make_user(organization, "dara@acme.test")
+    user.hashed_password = hash_password("mentework")
+    await db_session.flush()
+    headers = await auth_headers(user)
+
+    too_short = await api_client.post(
+        "/api/v1/me/password",
+        json={"current_password": "mentework", "new_password": "short"},
+        headers=headers,
+    )
+    assert too_short.status_code == 422
+
+    unchanged = await api_client.post(
+        "/api/v1/me/password",
+        json={"current_password": "mentework", "new_password": "mentework"},
+        headers=headers,
+    )
+    assert unchanged.status_code == 400

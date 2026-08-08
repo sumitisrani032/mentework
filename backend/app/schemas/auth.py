@@ -33,6 +33,21 @@ class AuthenticatedUser(BaseModel):
     full_name: str
 
 
+class ProfileUpdate(BaseModel):
+    """What a person may change about their own account.
+
+    Not their email address: it identifies the account inside the tenant and is
+    what they sign in with, so an administrator changes it, not the user.
+    """
+
+    full_name: str = Field(min_length=1, max_length=120)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
+
+
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
