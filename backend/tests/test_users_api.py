@@ -399,3 +399,98 @@ async def test_removing_people_needs_the_delete_permission(
     )
 
     assert response.status_code == 403
+
+
+async def test_an_account_can_be_deleted_outright(
+    api_client: httpx.AsyncClient, admin, colleague, auth_headers
+) -> None:
+    headers = await auth_headers(admin)
+
+    response = await api_client.delete(f"/api/v1/users/{colleague.id}", headers=headers)
+
+    assert response.status_code == 204
+    listed = (await api_client.get("/api/v1/users", headers=headers)).json()
+    assert [person["email"] for person in listed] == ["ada@acme.test"]
+
+
+async def test_deleting_someone_keeps_their_entries_but_not_their_name(
+    api_client: httpx.AsyncClient, project: Project, admin, colleague, auth_headers
+) -> None:
+    """The cost of a hard delete, stated in a test so it cannot surprise anyone."""
+    admin_headers = await auth_headers(admin)
+    sheet = (
+        await api_client.post(
+            f"/api/v1/projects/{project.id}/timesheets",
+            json={"title": "August"},
+            headers=admin_headers,
+        )
+    ).json()
+    await api_client.post(
+        f"/api/v1/projects/{project.id}/timesheets/{sheet['id']}/time",
+        json={"date": "2026-08-03", "logged_hours": 3},
+        headers=await auth_headers(colleague),
+    )
+
+    await api_client.delete(f"/api/v1/users/{colleague.id}", headers=admin_headers)
+
+    entries = (
+        await api_client.get(
+            f"/api/v1/projects/{project.id}/timesheets/{sheet['id']}/time", headers=admin_headers
+        )
+    ).json()
+    assert len(entries) == 1
+    assert entries[0]["logged_by"] is None
+
+
+async def test_the_listing_counts_what_a_deletion_would_orphan(
+    api_client: httpx.AsyncClient, project: Project, admin, colleague, auth_headers
+) -> None:
+    admin_headers = await auth_headers(admin)
+    sheet = (
+        await api_client.post(
+            f"/api/v1/projects/{project.id}/timesheets",
+            json={"title": "August"},
+            headers=admin_headers,
+        )
+    ).json()
+    for day in ("2026-08-03", "2026-08-04"):
+        await api_client.post(
+            f"/api/v1/projects/{project.id}/timesheets/{sheet['id']}/time",
+            json={"date": day, "logged_hours": 1},
+            headers=await auth_headers(colleague),
+        )
+
+    listed = (await api_client.get("/api/v1/users", headers=admin_headers)).json()
+    theirs = next(person for person in listed if person["email"] == "dara@acme.test")
+
+    assert theirs["logged_entries"] == 2
+
+
+async def test_you_cannot_delete_yourself(
+    api_client: httpx.AsyncClient, admin, auth_headers
+) -> None:
+    response = await api_client.delete(
+        f"/api/v1/users/{admin.id}", headers=await auth_headers(admin)
+    )
+
+    assert response.status_code == 400
+
+
+async def test_deleting_people_needs_the_delete_permission(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    project: Project,
+    seeded_roles,
+    make_user,
+    colleague,
+    auth_headers,
+) -> None:
+    manager = await make_user(
+        organization, "bruno@acme.test", role=seeded_roles["project-manager"], project_id=project.id
+    )
+
+    response = await api_client.delete(
+        f"/api/v1/users/{colleague.id}", headers=await auth_headers(manager)
+    )
+
+    assert response.status_code == 403

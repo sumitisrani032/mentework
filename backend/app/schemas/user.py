@@ -69,3 +69,7 @@ class MemberRead(BaseModel):
     full_name: str
     is_active: bool
     roles: list[MemberRoleRead]
+    # How much history is attached to them. Deleting the account keeps these
+    # entries but blanks their author, so the count is what makes that choice
+    # an informed one.
+    logged_entries: int = 0

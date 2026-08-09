@@ -9,7 +9,7 @@ another.
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -18,6 +18,7 @@ from app.api.deps import DbSession, require_permission
 from app.core.security import hash_password
 from app.models.project import Project
 from app.models.role import Feature, Role
+from app.models.timesheet import TimeEntry
 from app.models.user import User
 from app.models.user_role import UserRole
 from app.schemas.user import MemberCreate, MemberRead, MemberRoleRead, MemberUpdate
@@ -31,12 +32,13 @@ CanCreateMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "
 CanRemoveMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "delete"))]
 
 
-def _to_read(user: User) -> MemberRead:
+def _to_read(user: User, logged_entries: int = 0) -> MemberRead:
     return MemberRead(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
         is_active=user.is_active,
+        logged_entries=logged_entries,
         roles=[
             MemberRoleRead(
                 id=assignment.id,
@@ -47,6 +49,18 @@ def _to_read(user: User) -> MemberRead:
             for assignment in user.role_assignments
         ],
     )
+
+
+async def _entry_counts(db: AsyncSession, user_ids: list[int]) -> dict[int, int]:
+    """How many entries each person logged, in one query rather than per row."""
+    if not user_ids:
+        return {}
+    result = await db.execute(
+        select(TimeEntry.creator_id, func.count())
+        .where(TimeEntry.creator_id.in_(user_ids))
+        .group_by(TimeEntry.creator_id)
+    )
+    return {creator_id: count for creator_id, count in result.all()}
 
 
 async def _load_member(db: AsyncSession, user_id: int) -> User:
@@ -73,7 +87,9 @@ async def read_members(current_user: CanViewMembers, db: DbSession) -> list[Memb
         )
         .order_by(User.full_name)
     )
-    return [_to_read(user) for user in result.scalars().all()]
+    people = list(result.scalars().all())
+    counts = await _entry_counts(db, [person.id for person in people])
+    return [_to_read(person, counts.get(person.id, 0)) for person in people]
 
 
 @router.post(
@@ -137,27 +153,56 @@ async def update_member(
     Deactivating ends their access everywhere — the token check reads this on
     every request — while leaving the time they logged attributed to them.
     """
+    if payload.is_active:
+        user = await db.get(User, user_id)
+        if user is None or user.organization_id != current_user.organization_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    else:
+        # Taking access away runs the same checks as deleting outright.
+        user = await _removable(db, user_id, current_user)
+
+    user.is_active = payload.is_active
+    await db.commit()
+    return _to_read(await _load_member(db, user.id))
+
+
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an account for good",
+)
+async def delete_member(user_id: int, current_user: CanRemoveMembers, db: DbSession) -> None:
+    """Erase the account itself.
+
+    Their role grants go with it. The time they logged does not — the entries
+    survive with no author, which is why deactivating is the better answer
+    unless the account was created by mistake or the law requires the row gone.
+    """
+    user = await _removable(db, user_id, current_user)
+    await db.delete(user)
+    await db.commit()
+
+
+async def _removable(db: AsyncSession, user_id: int, actor: User) -> User:
+    """The shared checks for taking someone out, whether softly or for good."""
     user = await db.get(User, user_id)
-    if user is None or user.organization_id != current_user.organization_id:
+    if user is None or user.organization_id != actor.organization_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
 
-    if user.id == current_user.id and not payload.is_active:
+    if user.id == actor.id:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "You cannot deactivate your own account. Ask another administrator.",
+            "You cannot remove your own account. Ask another administrator.",
         )
 
-    if not payload.is_active and not await rbac.has_role_manager(
+    if not await rbac.has_role_manager(
         db, organization_id=user.organization_id, ignoring_user=user.id
     ):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "This is the only person left who can manage roles. Give someone else that role first.",
         )
-
-    user.is_active = payload.is_active
-    await db.commit()
-    return _to_read(await _load_member(db, user.id))
+    return user
 
 
 async def _own_role(db: AsyncSession, role_id: int, actor: User) -> Role:
