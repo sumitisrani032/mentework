@@ -14,6 +14,8 @@ export type Member = {
   full_name: string;
   is_active: boolean;
   roles: MemberRole[];
+  /** Entries they logged, which a deletion would leave without an author. */
+  logged_entries: number;
 };
 
 export type NewMember = {
@@ -76,6 +78,20 @@ export async function setMemberActive(
   return {
     ok: false,
     error: describeError(payload) ?? `Could not change this account (${response.status}).`,
+  };
+}
+
+/** Erase the account. Their entries survive; their name on them does not. */
+export async function deleteMember(
+  userId: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const response = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+  if (response.ok) return { ok: true };
+
+  const payload = await response.json().catch(() => null);
+  return {
+    ok: false,
+    error: describeError(payload) ?? `Could not delete this account (${response.status}).`,
   };
 }
 
