@@ -35,7 +35,12 @@ class Feature(enum.StrEnum):
 
     PROJECTS = "projects"
     TASKS = "tasks"
+    # The timesheet itself — creating, renaming and archiving the buckets time
+    # is logged into.
     TIMESHEET = "timesheet"
+    # Logging time into one. Separate because the two are different jobs: a
+    # manager sets up the month, everyone on the project fills it in.
+    TIME_ENTRY = "time_entry"
     GANTT = "gantt"
     CALENDAR = "calendar"
     DISCUSSIONS = "discussions"

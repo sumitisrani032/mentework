@@ -45,11 +45,13 @@ CanViewTimesheets = Annotated[
 CanCreateTimesheets = Annotated[
     Project, Depends(require_project_permission(Feature.TIMESHEET, "create"))
 ]
-CanEditTimesheets = Annotated[
-    Project, Depends(require_project_permission(Feature.TIMESHEET, "edit"))
-]
-CanDeleteTimesheets = Annotated[
-    Project, Depends(require_project_permission(Feature.TIMESHEET, "delete"))
+
+# Logging time is its own permission: a member fills a timesheet in without
+# being able to create, rename or archive one.
+CanLogTime = Annotated[Project, Depends(require_project_permission(Feature.TIME_ENTRY, "create"))]
+CanEditTime = Annotated[Project, Depends(require_project_permission(Feature.TIME_ENTRY, "edit"))]
+CanDeleteTime = Annotated[
+    Project, Depends(require_project_permission(Feature.TIME_ENTRY, "delete"))
 ]
 
 
@@ -57,6 +59,12 @@ async def _can_manage(db: AsyncSession, user: User, project_id: int) -> bool:
     """Whether the user may see private timesheets they are not part of."""
     granted = await effective_permissions(db, user_id=user.id, project_id=project_id)
     return granted[Feature.TIMESHEET].delete
+
+
+async def _can_manage_time(db: AsyncSession, user: User, project_id: int) -> bool:
+    """Whether the user may change entries other people logged."""
+    granted = await effective_permissions(db, user_id=user.id, project_id=project_id)
+    return granted[Feature.TIME_ENTRY].delete
 
 
 async def _load_timesheet(
@@ -248,7 +256,7 @@ async def _authors_of(db: AsyncSession, entries: list[TimeEntry]) -> dict[int, U
 async def create_time_entry(
     timesheet_id: int,
     payload: TimeEntryCreate,
-    project: CanCreateTimesheets,
+    project: CanLogTime,
     current_user: CurrentUser,
     db: DbSession,
 ) -> TimeEntryRead:
@@ -285,7 +293,7 @@ async def create_time_entry(
 )
 async def import_time_entries(
     timesheet_id: int,
-    project: CanCreateTimesheets,
+    project: CanLogTime,
     current_user: CurrentUser,
     db: DbSession,
     file: Annotated[UploadFile, File(description="CSV: date, logged_hours, description, status")],
@@ -390,7 +398,7 @@ async def _load_entry(
     if entry is None or entry.timesheet_id != timesheet.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Time entry not found")
 
-    can_manage = await _can_manage(db, user, project.id)
+    can_manage = await _can_manage_time(db, user, project.id)
     if not service.may_modify(entry, user_id=user.id, can_manage=can_manage):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
@@ -408,7 +416,7 @@ async def update_time_entry(
     timesheet_id: int,
     entry_id: int,
     payload: TimeEntryUpdate,
-    project: CanEditTimesheets,
+    project: CanEditTime,
     current_user: CurrentUser,
     db: DbSession,
 ) -> TimeEntryRead:
@@ -448,7 +456,7 @@ async def update_time_entry(
 async def delete_time_entry(
     timesheet_id: int,
     entry_id: int,
-    project: CanDeleteTimesheets,
+    project: CanDeleteTime,
     current_user: CurrentUser,
     db: DbSession,
 ) -> None:

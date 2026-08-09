@@ -64,6 +64,7 @@ DEFAULT_ROLES: tuple[RoleDefinition, ...] = (
             # able to correct and remove entries logged by the team, and to see
             # private timesheets when auditing.
             Feature.TIMESHEET: FULL,
+            Feature.TIME_ENTRY: FULL,
             Feature.GANTT: MANAGE,
             Feature.CALENDAR: MANAGE,
             Feature.DISCUSSIONS: FULL,
@@ -81,6 +82,7 @@ DEFAULT_ROLES: tuple[RoleDefinition, ...] = (
             Feature.PROJECTS: VIEW,
             Feature.TASKS: MANAGE,
             Feature.TIMESHEET: VIEW,
+            Feature.TIME_ENTRY: MANAGE,
             Feature.GANTT: EDIT,
             Feature.CALENDAR: VIEW,
             Feature.DISCUSSIONS: CONTRIBUTE,
@@ -93,11 +95,14 @@ DEFAULT_ROLES: tuple[RoleDefinition, ...] = (
         slug="member",
         name="Member",
         description="Work on assigned tasks, update status, log time and add notes or files.",
+        # Time: can log and correct their own entries, cannot create timesheets.
         scope=RoleScope.PROJECT,
         permissions={
             Feature.PROJECTS: VIEW,
             Feature.TASKS: EDIT,
-            Feature.TIMESHEET: MANAGE,
+            # A member fills a timesheet in; setting one up is a manager's job.
+            Feature.TIMESHEET: VIEW,
+            Feature.TIME_ENTRY: MANAGE,
             Feature.GANTT: VIEW,
             Feature.CALENDAR: VIEW,
             Feature.DISCUSSIONS: CONTRIBUTE,

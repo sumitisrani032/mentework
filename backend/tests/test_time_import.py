@@ -151,11 +151,20 @@ async def member(organization, project, seeded_roles, make_user):
     )
 
 
-async def make_timesheet(api_client, project, headers) -> str:
+@pytest.fixture
+async def manager(organization, project, seeded_roles, make_user):
+    return await make_user(
+        organization, "bruno@acme.test", role=seeded_roles["project-manager"], project_id=project.id
+    )
+
+
+@pytest.fixture
+async def timesheet_id(api_client, project, manager, auth_headers) -> str:
+    """A timesheet the manager set up; uploading into one is a separate right."""
     created = await api_client.post(
         f"/api/v1/projects/{project.id}/timesheets",
         json={"title": "October"},
-        headers=headers,
+        headers=await auth_headers(manager),
     )
     return created.json()["id"]
 
@@ -165,10 +174,9 @@ def import_url(project: Project, timesheet_id: str) -> str:
 
 
 async def test_a_member_can_upload_a_month_of_time(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers, timesheet_id: str
 ) -> None:
     headers = await auth_headers(member)
-    timesheet_id = await make_timesheet(api_client, project, headers)
 
     response = await api_client.post(
         import_url(project, timesheet_id),
@@ -194,11 +202,10 @@ async def test_a_member_can_upload_a_month_of_time(
 
 
 async def test_one_bad_row_rejects_the_whole_file(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers, timesheet_id: str
 ) -> None:
     """A half-imported month is worse than one that never landed."""
     headers = await auth_headers(member)
-    timesheet_id = await make_timesheet(api_client, project, headers)
 
     response = await api_client.post(
         import_url(project, timesheet_id),
@@ -223,11 +230,10 @@ async def test_one_bad_row_rejects_the_whole_file(
 
 
 async def test_uploading_the_same_file_twice_does_not_double_count(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers, timesheet_id: str
 ) -> None:
     """The most common way to corrupt a month of timesheets."""
     headers = await auth_headers(member)
-    timesheet_id = await make_timesheet(api_client, project, headers)
     body = "date,logged_hours,description,status\n2026-08-03,1:40,Brainstorm,billable\n"
 
     first = await api_client.post(
@@ -248,11 +254,10 @@ async def test_uploading_the_same_file_twice_does_not_double_count(
 
 
 async def test_duplicates_can_be_forced_through(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers, timesheet_id: str
 ) -> None:
     """Genuinely repeated work must still be loggable."""
     headers = await auth_headers(member)
-    timesheet_id = await make_timesheet(api_client, project, headers)
     body = "date,logged_hours,description,status\n2026-08-03,1:00,Standup,none\n"
 
     await api_client.post(import_url(project, timesheet_id), files=upload(body), headers=headers)
@@ -266,10 +271,9 @@ async def test_duplicates_can_be_forced_through(
 
 
 async def test_a_dry_run_validates_without_saving(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers, timesheet_id: str
 ) -> None:
     headers = await auth_headers(member)
-    timesheet_id = await make_timesheet(api_client, project, headers)
 
     response = await api_client.post(
         f"{import_url(project, timesheet_id)}?dry_run=true",
@@ -307,11 +311,8 @@ async def test_a_viewer_cannot_bulk_upload(
     seeded_roles,
     make_user,
     auth_headers,
-    member,
+    timesheet_id: str,
 ) -> None:
-    member_headers = await auth_headers(member)
-    timesheet_id = await make_timesheet(api_client, project, member_headers)
-
     viewer = await make_user(
         organization, "gita@acme.test", role=seeded_roles["viewer"], project_id=project.id
     )
@@ -325,11 +326,10 @@ async def test_a_viewer_cannot_bulk_upload(
 
 
 async def test_a_dry_run_flags_rows_that_would_be_skipped(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers, timesheet_id: str
 ) -> None:
     """The preview must show duplicates, not quietly drop them."""
     headers = await auth_headers(member)
-    timesheet_id = await make_timesheet(api_client, project, headers)
     body = "date,logged_hours,description,status\n2026-08-03,1:00,Standup,none\n"
 
     await api_client.post(import_url(project, timesheet_id), files=upload(body), headers=headers)

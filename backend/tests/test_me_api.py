@@ -13,6 +13,12 @@ from app.models.user_role import UserRole
 
 
 @pytest.fixture
+async def admin(organization: Organization, seeded_roles: dict[str, Role], make_user):
+    """Someone who may set a timesheet up, which the people logging time cannot."""
+    return await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+
+
+@pytest.fixture
 async def second_project(db_session, organization: Organization) -> Project:
     item = Project(organization_id=organization.id, name="Mobile App", key="MOB")
     db_session.add(item)
@@ -32,9 +38,13 @@ async def log_time(
     title: str,
     date: str,
     hours: int,
+    sheet_headers: dict[str, str] | None = None,
 ) -> dict:
+    """Log an hour or two, creating the timesheet as whoever may create one."""
     sheet = (
-        await api_client.post(timesheets_url(project), json={"title": title}, headers=headers)
+        await api_client.post(
+            timesheets_url(project), json={"title": title}, headers=sheet_headers or headers
+        )
     ).json()
     posted = await api_client.post(
         f"{timesheets_url(project)}/{sheet['id']}/time",
@@ -79,6 +89,7 @@ async def test_only_your_own_entries_come_back(
     seeded_roles: dict[str, Role],
     make_user,
     auth_headers,
+    admin,
 ) -> None:
     """A shared timesheet shows the whole team, but "my time" is only mine."""
     mine = await make_user(
@@ -90,7 +101,13 @@ async def test_only_your_own_entries_come_back(
     my_headers = await auth_headers(mine)
 
     sheet = await log_time(
-        api_client, project, my_headers, title="August", date="2026-08-03", hours=2
+        api_client,
+        project,
+        my_headers,
+        title="August",
+        date="2026-08-03",
+        hours=2,
+        sheet_headers=await auth_headers(admin),
     )
     await api_client.post(
         f"{timesheets_url(project)}/{sheet['id']}/time",
@@ -112,12 +129,21 @@ async def test_time_on_a_project_you_lost_access_to_is_hidden(
     seeded_roles: dict[str, Role],
     make_user,
     auth_headers,
+    admin,
 ) -> None:
     user = await make_user(
         organization, "dara@acme.test", role=seeded_roles["member"], project_id=project.id
     )
     headers = await auth_headers(user)
-    await log_time(api_client, project, headers, title="August", date="2026-08-03", hours=4)
+    await log_time(
+        api_client,
+        project,
+        headers,
+        title="August",
+        date="2026-08-03",
+        hours=4,
+        sheet_headers=await auth_headers(admin),
+    )
 
     # Taken off the project, the time they logged goes with it.
     await db_session.execute(delete(UserRole).where(UserRole.user_id == user.id))
@@ -134,12 +160,21 @@ async def test_the_limit_caps_the_listing(
     seeded_roles: dict[str, Role],
     make_user,
     auth_headers,
+    admin,
 ) -> None:
     user: User = await make_user(
         organization, "dara@acme.test", role=seeded_roles["member"], project_id=project.id
     )
     headers = await auth_headers(user)
-    sheet = await log_time(api_client, project, headers, title="August", date="2026-08-01", hours=1)
+    sheet = await log_time(
+        api_client,
+        project,
+        headers,
+        title="August",
+        date="2026-08-01",
+        hours=1,
+        sheet_headers=await auth_headers(admin),
+    )
     for day in range(2, 6):
         await api_client.post(
             f"{timesheets_url(project)}/{sheet['id']}/time",

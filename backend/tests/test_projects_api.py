@@ -79,8 +79,10 @@ async def test_project_permissions_describe_what_the_caller_may_do(
 
     assert response.status_code == 200
     body = response.json()
-    # Member may log time but not manage roles.
-    assert body["timesheet"]["create"] is True
+    # Member may log time, but not set up a timesheet or manage roles.
+    assert body["time_entry"]["create"] is True
+    assert body["timesheet"]["view"] is True
+    assert body["timesheet"]["create"] is False
     assert body["roles"]["view"] is False
 
 

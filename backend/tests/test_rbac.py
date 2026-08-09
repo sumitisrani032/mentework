@@ -133,7 +133,7 @@ async def test_permissions_are_the_union_of_every_applicable_role(
     on_mobile = await effective_permissions(db_session, user_id=user.id, project_id=mobile.id)
 
     # Member may log time on the website project; Viewer may not on mobile.
-    assert on_website[Feature.TIMESHEET].create
+    assert on_website[Feature.TIME_ENTRY].create
     assert not on_mobile[Feature.TIMESHEET].create
     assert on_mobile[Feature.TASKS].view
 

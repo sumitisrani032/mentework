@@ -65,8 +65,11 @@ async def test_each_entry_says_who_logged_it(
     api_client: httpx.AsyncClient, project: Project, team, auth_headers
 ) -> None:
     dara_headers = await auth_headers(team["dara"])
+    # The manager sets the timesheet up; Dara only fills it in.
     sheet = (
-        await api_client.post(base(project), json={"title": "June"}, headers=dara_headers)
+        await api_client.post(
+            base(project), json={"title": "June"}, headers=await auth_headers(team["manager"])
+        )
     ).json()
     await api_client.post(
         f"{base(project)}/{sheet['id']}/time",

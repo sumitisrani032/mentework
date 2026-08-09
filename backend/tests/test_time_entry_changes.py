@@ -26,9 +26,17 @@ def base(project: Project) -> str:
     return f"/api/v1/projects/{project.id}/timesheets"
 
 
-async def setup_entry(api_client, project, headers, **overrides) -> tuple[str, str]:
-    """Create a timesheet with one entry, returning both ids."""
-    sheet = (await api_client.post(base(project), json={"title": "August"}, headers=headers)).json()
+@pytest.fixture
+async def sheet(api_client, project, manager, auth_headers) -> str:
+    """A timesheet, made by the manager — filling one in is not creating one."""
+    created = await api_client.post(
+        base(project), json={"title": "August"}, headers=await auth_headers(manager)
+    )
+    return created.json()["id"]
+
+
+async def setup_entry(api_client, project, headers, sheet, **overrides) -> tuple[str, str]:
+    """Log one entry into the timesheet, returning the sheet and entry ids."""
     payload = {
         "date": "2026-08-03",
         "logged_hours": 1,
@@ -37,19 +45,23 @@ async def setup_entry(api_client, project, headers, **overrides) -> tuple[str, s
         "description": "Brainstorm",
     } | overrides
     entry = (
-        await api_client.post(f"{base(project)}/{sheet['id']}/time", json=payload, headers=headers)
+        await api_client.post(f"{base(project)}/{sheet}/time", json=payload, headers=headers)
     ).json()
-    return sheet["id"], entry["id"]
+    return sheet, entry["id"]
 
 
 # --- Editing ----------------------------------------------------------------
 
 
 async def test_you_can_correct_your_own_entry(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, headers, sheet)
 
     response = await api_client.patch(
         f"{base(project)}/{sheet_id}/time/{entry_id}",
@@ -67,10 +79,14 @@ async def test_you_can_correct_your_own_entry(
 
 
 async def test_omitting_a_field_leaves_it_alone(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, headers, sheet)
 
     response = await api_client.patch(
         f"{base(project)}/{sheet_id}/time/{entry_id}", json={"status": "billed"}, headers=headers
@@ -83,11 +99,15 @@ async def test_omitting_a_field_leaves_it_alone(
 
 
 async def test_a_description_can_be_cleared_explicitly(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     """Sending null differs from omitting the field."""
     headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, headers, sheet)
 
     response = await api_client.patch(
         f"{base(project)}/{sheet_id}/time/{entry_id}", json={"description": None}, headers=headers
@@ -97,10 +117,14 @@ async def test_a_description_can_be_cleared_explicitly(
 
 
 async def test_an_edit_cannot_zero_the_duration(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, headers, sheet)
 
     response = await api_client.patch(
         f"{base(project)}/{sheet_id}/time/{entry_id}",
@@ -112,10 +136,14 @@ async def test_an_edit_cannot_zero_the_duration(
 
 
 async def test_an_edit_cannot_move_time_into_the_future(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, headers, sheet)
 
     response = await api_client.patch(
         f"{base(project)}/{sheet_id}/time/{entry_id}", json={"date": "2099-01-01"}, headers=headers
@@ -125,11 +153,15 @@ async def test_an_edit_cannot_move_time_into_the_future(
 
 
 async def test_editing_changes_the_timesheet_total(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     """Totals are derived, so a correction must flow through immediately."""
     headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, headers, sheet)
 
     await api_client.patch(
         f"{base(project)}/{sheet_id}/time/{entry_id}",
@@ -146,11 +178,16 @@ async def test_editing_changes_the_timesheet_total(
 
 
 async def test_a_member_cannot_edit_someone_elses_time(
-    api_client: httpx.AsyncClient, project: Project, manager, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    manager,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     """Ordinary members must not be able to rewrite a colleague's hours."""
     manager_headers = await auth_headers(manager)
-    sheet_id, entry_id = await setup_entry(api_client, project, manager_headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, manager_headers, sheet)
 
     response = await api_client.patch(
         f"{base(project)}/{sheet_id}/time/{entry_id}",
@@ -163,10 +200,15 @@ async def test_a_member_cannot_edit_someone_elses_time(
 
 
 async def test_a_manager_can_correct_anyones_time(
-    api_client: httpx.AsyncClient, project: Project, manager, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    manager,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     member_headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, member_headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, member_headers, sheet)
 
     response = await api_client.patch(
         f"{base(project)}/{sheet_id}/time/{entry_id}",
@@ -182,11 +224,15 @@ async def test_a_manager_can_correct_anyones_time(
 
 
 async def test_a_member_cannot_delete_time_by_default(
-    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     """Member has timesheet edit but not delete in the default matrix."""
     headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, headers, sheet)
 
     response = await api_client.delete(
         f"{base(project)}/{sheet_id}/time/{entry_id}", headers=headers
@@ -196,10 +242,15 @@ async def test_a_member_cannot_delete_time_by_default(
 
 
 async def test_a_manager_can_delete_an_entry(
-    api_client: httpx.AsyncClient, project: Project, manager, member, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    manager,
+    member,
+    auth_headers,
+    sheet: str,
 ) -> None:
     member_headers = await auth_headers(member)
-    sheet_id, entry_id = await setup_entry(api_client, project, member_headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, member_headers, sheet)
     manager_headers = await auth_headers(manager)
 
     response = await api_client.delete(
@@ -212,10 +263,14 @@ async def test_a_manager_can_delete_an_entry(
 
 
 async def test_deleting_an_entry_lowers_the_total(
-    api_client: httpx.AsyncClient, project: Project, manager, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    manager,
+    auth_headers,
+    sheet: str,
 ) -> None:
     headers = await auth_headers(manager)
-    sheet_id, entry_id = await setup_entry(api_client, project, headers)
+    sheet_id, entry_id = await setup_entry(api_client, project, headers, sheet)
     await api_client.post(
         f"{base(project)}/{sheet_id}/time",
         json={"date": "2026-08-04", "logged_hours": 2},
@@ -232,10 +287,14 @@ async def test_deleting_an_entry_lowers_the_total(
 
 
 async def test_an_entry_from_another_timesheet_is_not_found(
-    api_client: httpx.AsyncClient, project: Project, manager, auth_headers
+    api_client: httpx.AsyncClient,
+    project: Project,
+    manager,
+    auth_headers,
+    sheet: str,
 ) -> None:
     headers = await auth_headers(manager)
-    _, entry_id = await setup_entry(api_client, project, headers)
+    _, entry_id = await setup_entry(api_client, project, headers, sheet)
     other_sheet = (
         await api_client.post(base(project), json={"title": "September"}, headers=headers)
     ).json()
@@ -257,8 +316,9 @@ async def test_a_viewer_cannot_edit_anything(
     manager,
     make_user,
     auth_headers,
+    sheet: str,
 ) -> None:
-    sheet_id, entry_id = await setup_entry(api_client, project, await auth_headers(manager))
+    sheet_id, entry_id = await setup_entry(api_client, project, await auth_headers(manager), sheet)
     viewer = await make_user(
         organization, "gita@acme.test", role=seeded_roles["viewer"], project_id=project.id
     )
@@ -270,3 +330,39 @@ async def test_a_viewer_cannot_edit_anything(
     )
 
     assert response.status_code == 403
+
+
+# --- Who may set a timesheet up, and who may only fill one in ----------------
+
+
+async def test_a_member_cannot_create_a_timesheet(
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers
+) -> None:
+    response = await api_client.post(
+        base(project), json={"title": "September"}, headers=await auth_headers(member)
+    )
+
+    assert response.status_code == 403
+
+
+async def test_a_member_can_log_time_into_one(
+    api_client: httpx.AsyncClient, project: Project, member, auth_headers, sheet: str
+) -> None:
+    """The point of the split: filling a timesheet in is not managing one."""
+    response = await api_client.post(
+        f"{base(project)}/{sheet}/time",
+        json={"date": "2026-08-03", "logged_hours": 4},
+        headers=await auth_headers(member),
+    )
+
+    assert response.status_code == 201
+
+
+async def test_a_manager_can_create_a_timesheet(
+    api_client: httpx.AsyncClient, project: Project, manager, auth_headers
+) -> None:
+    response = await api_client.post(
+        base(project), json={"title": "September"}, headers=await auth_headers(manager)
+    )
+
+    assert response.status_code == 201
