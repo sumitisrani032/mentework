@@ -68,6 +68,23 @@ export function applyFilters(entries: TimeEntry[], filters: EntryFilters): TimeE
   });
 }
 
+/** yyyy-mm-dd as a compact day. Read in UTC so the date never shifts back one. */
+export function shortDate(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+/** How the chosen range reads on the Filters row. */
+export function rangeLabel(from: string | null, to: string | null): string {
+  if (from && to) return `${shortDate(from)} – ${shortDate(to)}`;
+  if (from) return `From ${shortDate(from)}`;
+  if (to) return `Until ${shortDate(to)}`;
+  return "All";
+}
+
 export type EntryGroup = { key: string; label: string; entries: TimeEntry[] };
 
 /** Everyone who has logged time here, for the "Logged by" choices. */

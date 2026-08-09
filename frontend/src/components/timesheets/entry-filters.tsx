@@ -1,9 +1,10 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { type EntryFilters, activeFilterCount } from "@/lib/entry-filters";
+import { buttonClass } from "@/components/ui/button";
+import { type EntryFilters, activeFilterCount, rangeLabel } from "@/lib/entry-filters";
 
 type IconProps = { className?: string };
 
@@ -158,29 +159,12 @@ export function EntryFilterMenu({
         </div>
 
         <dl className="mt-3 divide-y divide-border">
-          {/* Two date fields do not fit beside a label, so this row stacks. */}
-          <Row icon={CalendarIcon} label="Date range" stack>
-            <span className="flex w-full items-center gap-1">
-              <input
-                type="date"
-                aria-label="From"
-                value={filters.from ?? ""}
-                max={filters.to ?? undefined}
-                onChange={(event) => change({ from: event.target.value })}
-                className={`${CONTROL_CLASS} border-border`}
-              />
-              <span aria-hidden className="text-muted">
-                –
-              </span>
-              <input
-                type="date"
-                aria-label="To"
-                value={filters.to ?? ""}
-                min={filters.from ?? undefined}
-                onChange={(event) => change({ to: event.target.value })}
-                className={`${CONTROL_CLASS} border-border`}
-              />
-            </span>
+          <Row icon={CalendarIcon} label="Date range">
+            <DateRangeField
+              from={filters.from}
+              to={filters.to}
+              onApply={(from, to) => change({ from, to })}
+            />
           </Row>
 
           <Row icon={CheckCircleIcon} label="Status">
@@ -241,22 +225,186 @@ export function EntryFilterMenu({
 function Row({
   icon: Icon,
   label,
-  stack = false,
   children,
 }: {
   icon: (props: IconProps) => React.ReactElement;
   label: string;
-  /** Put the control under the label instead of beside it, for wide controls. */
-  stack?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className={`gap-3 py-2.5 ${stack ? "" : "flex items-center"}`}>
+    <div className="flex items-center gap-3 py-2.5">
       <dt className="flex w-28 shrink-0 items-center gap-2 text-sm text-muted">
         <Icon className="size-4 shrink-0" />
         {label}
       </dt>
-      <dd className={`flex min-w-0 ${stack ? "mt-1.5 w-full" : "flex-1"}`}>{children}</dd>
+      <dd className="flex min-w-0 flex-1">{children}</dd>
     </div>
   );
+}
+
+/** Local yyyy-mm-dd. Built from the local parts so "today" is the user's today. */
+function isoDay(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+/** A window ending today, `days` long, as the pair the filter stores. */
+function lastDays(days: number): { from: string; to: string } {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - (days - 1));
+  return { from: isoDay(start), to: isoDay(end) };
+}
+
+const PRESETS = [
+  { key: "all", label: "All", range: () => ({ from: null, to: null }) },
+  { key: "today", label: "Today", range: () => lastDays(1) },
+  { key: "week", label: "Last week", range: () => lastDays(7) },
+  { key: "fortnight", label: "Last 2 weeks", range: () => lastDays(14) },
+  { key: "month", label: "Last month", range: () => lastDays(30) },
+] as const;
+
+/**
+ * The date range as a menu of the ranges people actually ask for, with a
+ * custom start and end underneath.
+ *
+ * Presets resolve to real dates the moment they are picked rather than being
+ * stored as "last week": the query string then says exactly which days are on
+ * screen, and a link to it still shows those days tomorrow.
+ */
+function DateRangeField({
+  from,
+  to,
+  onApply,
+}: {
+  from: string | null;
+  to: string | null;
+  onApply: (from: string | null, to: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  // Dates already set can only have come from a custom range or a preset that
+  // has since drifted, so the panel opens on Custom showing them.
+  const [custom, setCustom] = useState(Boolean(from || to));
+  const [start, setStart] = useState(from ?? "");
+  const [end, setEnd] = useState(to ?? "");
+
+  function choose(preset: (typeof PRESETS)[number]) {
+    const range = preset.range();
+    setCustom(false);
+    setStart(range.from ?? "");
+    setEnd(range.to ?? "");
+    setOpen(false);
+    onApply(range.from, range.to);
+  }
+
+  return (
+    <span className="relative flex-1">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className={`${CONTROL_CLASS} w-full text-left`}
+      >
+        {rangeLabel(from, to)}
+      </button>
+
+      {open ? (
+        <div className="absolute top-0 right-full z-40 mr-3 max-h-[70vh] w-64 overflow-y-auto rounded-xl border border-border bg-background p-4 shadow-xl">
+          <h5 className="font-medium">Date range</h5>
+
+          <div role="radiogroup" aria-label="Date range" className="mt-3 space-y-1">
+            {PRESETS.map((preset) => (
+              <label
+                key={preset.key}
+                className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-sm hover:bg-surface"
+              >
+                <input
+                  type="radio"
+                  name="date-range"
+                  checked={!custom && rangeMatches(preset, from, to)}
+                  onChange={() => choose(preset)}
+                  className="size-4 accent-[var(--primary)]"
+                />
+                {preset.label}
+              </label>
+            ))}
+            <label className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-sm hover:bg-surface">
+              <input
+                type="radio"
+                name="date-range"
+                checked={custom}
+                onChange={() => setCustom(true)}
+                className="size-4 accent-[var(--primary)]"
+              />
+              Custom
+            </label>
+          </div>
+
+          {custom ? (
+            <div className="mt-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-xs text-muted">
+                  Start
+                  <input
+                    type="date"
+                    value={start}
+                    max={end || undefined}
+                    onChange={(event) => setStart(event.target.value)}
+                    className={`${CONTROL_CLASS} mt-1 w-full border-border text-foreground`}
+                  />
+                </label>
+                <label className="block text-xs text-muted">
+                  End
+                  <input
+                    type="date"
+                    value={end}
+                    min={start || undefined}
+                    onChange={(event) => setEnd(event.target.value)}
+                    className={`${CONTROL_CLASS} mt-1 w-full border-border text-foreground`}
+                  />
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStart(from ?? "");
+                    setEnd(to ?? "");
+                    setOpen(false);
+                  }}
+                  className={buttonClass("ghost", "sm")}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    onApply(start || null, end || null);
+                  }}
+                  className={buttonClass("primary", "sm")}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </span>
+  );
+}
+
+/** Whether the dates on screen are exactly what this preset would produce. */
+function rangeMatches(
+  preset: (typeof PRESETS)[number],
+  from: string | null,
+  to: string | null,
+): boolean {
+  const range = preset.range();
+  return (range.from ?? null) === from && (range.to ?? null) === to;
 }
