@@ -146,6 +146,18 @@ async def delete_role(role_id: int, current_user: CanDeleteRoles, db: DbSession)
             status.HTTP_400_BAD_REQUEST,
             "Built-in roles cannot be deleted. Adjust their permissions instead.",
         )
+
+    # Deleting a role takes its grants with it, so it can leave a workspace
+    # with nobody able to administer it — the same trap as removing a grant.
+    if not await rbac.has_role_manager(
+        db, organization_id=current_user.organization_id, ignoring_role=role.id
+    ):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "This is the only role left that can manage roles. "
+            "Give someone another one before deleting it.",
+        )
+
     await db.delete(role)
     await db.commit()
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { buttonClass } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import {
   type Permission,
   type Role,
   type RoleMatrix,
+  deleteRole,
   saveRolePermissions,
 } from "@/lib/rbac";
 
@@ -50,11 +52,21 @@ function isSameMatrix(a: Record<string, Permission>, b: Record<string, Permissio
   );
 }
 
-export function PermissionMatrix({ matrix }: { matrix: RoleMatrix }) {
+export function PermissionMatrix({
+  matrix,
+  canDelete = false,
+}: {
+  matrix: RoleMatrix;
+  canDelete?: boolean;
+}) {
+  const router = useRouter();
+  const [removing, setRemoving] = useState(false);
   const [saved, setSaved] = useState<Draft>(() => toDraft(matrix.roles));
   const [draft, setDraft] = useState<Draft>(() => toDraft(matrix.roles));
-  const [activeRoleId, setActiveRoleId] = useState(matrix.roles[0]?.id ?? "");
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [activeRoleId, setActiveRoleId] = useState(matrix.roles[0]?.id ?? 0);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "deleting" | "error">(
+    "idle",
+  );
   const [error, setError] = useState<string | null>(null);
 
   const activeRole = matrix.roles.find((role) => role.id === activeRoleId) ?? matrix.roles[0];
@@ -100,6 +112,26 @@ export function PermissionMatrix({ matrix }: { matrix: RoleMatrix }) {
     }
   }
 
+  async function remove() {
+    setStatus("deleting");
+    setError(null);
+
+    const result = await deleteRole(activeRole.id);
+
+    if (!result.ok) {
+      setStatus("error");
+      setError(result.error);
+      setRemoving(false);
+      return;
+    }
+
+    // The deleted role is gone from the next render, so move off it first.
+    setActiveRoleId(matrix.roles.find((role) => role.id !== activeRole.id)?.id ?? 0);
+    setStatus("idle");
+    setRemoving(false);
+    router.refresh();
+  }
+
   function reset() {
     setStatus("idle");
     setError(null);
@@ -140,6 +172,40 @@ export function PermissionMatrix({ matrix }: { matrix: RoleMatrix }) {
             ) : null}
           </div>
           <div className="flex items-center gap-2">
+            {/* Built-in roles have no delete: the API refuses it, and offering
+                a button that always fails is worse than not offering one. */}
+            {canDelete && !activeRole.is_system ? (
+              removing ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-xs text-muted">
+                    Delete {activeRole.name}? Anyone holding it loses that access.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRemoving(false)}
+                    className={buttonClass("ghost", "sm")}
+                  >
+                    Keep
+                  </button>
+                  <button
+                    type="button"
+                    onClick={remove}
+                    disabled={status === "deleting"}
+                    className="inline-flex h-9 items-center rounded-lg bg-red-500/15 px-3.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-500/25 disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    {status === "deleting" ? "Deleting…" : "Delete role"}
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setRemoving(true)}
+                  className={`${buttonClass("ghost", "sm")} hover:bg-red-500/10 hover:text-red-500`}
+                >
+                  Delete role
+                </button>
+              )
+            ) : null}
             {isDirty ? (
               <button type="button" onClick={reset} className={buttonClass("ghost", "sm")}>
                 Reset

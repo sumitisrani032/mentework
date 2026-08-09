@@ -259,6 +259,7 @@ async def has_role_manager(
     organization_id: int,
     ignoring_assignment: int | None = None,
     ignoring_user: int | None = None,
+    ignoring_role: int | None = None,
 ) -> bool:
     """Whether anyone still active in the organization can edit roles.
 
@@ -282,6 +283,8 @@ async def has_role_manager(
         query = query.where(UserRole.id != ignoring_assignment)
     if ignoring_user is not None:
         query = query.where(UserRole.user_id != ignoring_user)
+    if ignoring_role is not None:
+        query = query.where(UserRole.role_id != ignoring_role)
 
     return (await session.execute(query)).scalars().first() is not None
 

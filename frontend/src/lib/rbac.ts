@@ -58,6 +58,25 @@ export async function saveRolePermissions(
   return (await response.json()) as Role;
 }
 
+/**
+ * Delete a custom role.
+ *
+ * The API refuses the built-in ones, and refuses any role that is the last way
+ * anyone can reach the matrix — its message comes back for the page to show.
+ */
+export async function deleteRole(
+  roleId: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const response = await fetch(`/api/roles/${roleId}`, { method: "DELETE" });
+  if (response.ok) return { ok: true };
+
+  const detail = await response.json().catch(() => null);
+  return {
+    ok: false,
+    error: describeError(detail) ?? `Could not delete this role (${response.status}).`,
+  };
+}
+
 export function describeError(detail: unknown): string | null {
   if (detail && typeof detail === "object" && "detail" in detail) {
     const value = (detail as { detail: unknown }).detail;

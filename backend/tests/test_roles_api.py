@@ -221,3 +221,48 @@ async def test_removing_a_grant_needs_the_roles_permission(
     )
 
     assert response.status_code == 403
+
+
+async def test_deleting_a_role_cannot_orphan_role_management(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
+) -> None:
+    """A custom role holding the only path to the matrix cannot be deleted."""
+    headers = await auth_headers(
+        await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+    )
+
+    created = await api_client.post(
+        ROLES_URL, json={"name": "Ops Admin", "scope": "organization"}, headers=headers
+    )
+    role_id = created.json()["id"]
+    matrix = [
+        {"feature": feature.value, "can_view": True, "can_edit": feature is Feature.ROLES}
+        for feature in Feature
+    ]
+    await api_client.put(
+        f"{ROLES_URL}/{role_id}/permissions", json={"permissions": matrix}, headers=headers
+    )
+
+    # Deletable while the built-in admin still grants role management.
+    assert (await api_client.delete(f"{ROLES_URL}/{role_id}", headers=headers)).status_code == 204
+
+
+async def test_a_built_in_role_still_cannot_be_deleted(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
+) -> None:
+    headers = await auth_headers(
+        await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+    )
+
+    response = await api_client.delete(f"{ROLES_URL}/{seeded_roles['member'].id}", headers=headers)
+
+    assert response.status_code == 400
+    assert "Built-in roles" in response.json()["detail"]

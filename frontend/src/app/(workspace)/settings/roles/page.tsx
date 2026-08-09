@@ -27,6 +27,10 @@ export default async function RolesSettingsPage() {
     redirect("/login");
   }
 
+  const canDeleteRoles = session.permissions.some(
+    (grant) => grant.feature === "roles" && grant.can_delete,
+  );
+
   const result = await fetchRoleMatrix();
   if (result.status === "unauthenticated") {
     redirect("/login");
@@ -64,7 +68,7 @@ export default async function RolesSettingsPage() {
                 <code className="font-mono">npm run dev:api</code>.
               </Notice>
             ) : (
-              <PermissionMatrix matrix={result.matrix} />
+              <PermissionMatrix matrix={result.matrix} canDelete={canDeleteRoles} />
             )}
           </div>
         </Container>
