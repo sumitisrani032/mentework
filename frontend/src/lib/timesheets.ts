@@ -129,19 +129,17 @@ export function formatDuration(hours: number | null, mins: number | null): strin
 }
 
 /**
- * Render a yyyy-mm-dd date as a readable heading.
+ * Render a yyyy-mm-dd date as DD/MM/YYYY — the one date format the workspace
+ * shows, everywhere, so a date reads the same on every screen.
  *
- * Formatted in UTC: the string has no timezone, and letting the browser assume
- * local time shifts it to the previous day for anyone west of Greenwich.
+ * Built from the string's own parts rather than through toLocaleDateString:
+ * the locale decides day-first or month-first, which is exactly the variation
+ * this is meant to remove.
  */
-export function formatDateHeading(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+export function formatDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-");
+  if (!year || !month || !day) return isoDate;
+  return `${day}/${month}/${year}`;
 }
 
 /** Group entries under their date, newest first, preserving order within a day. */

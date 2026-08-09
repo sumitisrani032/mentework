@@ -1,4 +1,4 @@
-import { type TimeEntry, formatDateHeading } from "@/lib/timesheets";
+import { type TimeEntry, formatDate } from "@/lib/timesheets";
 
 export type StatusFilter = "all" | TimeEntry["status"];
 export type GroupBy = "date" | "person";
@@ -68,20 +68,11 @@ export function applyFilters(entries: TimeEntry[], filters: EntryFilters): TimeE
   });
 }
 
-/** yyyy-mm-dd as a compact day. Read in UTC so the date never shifts back one. */
-export function shortDate(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
-
 /** How the chosen range reads on the Filters row. */
 export function rangeLabel(from: string | null, to: string | null): string {
-  if (from && to) return `${shortDate(from)} – ${shortDate(to)}`;
-  if (from) return `From ${shortDate(from)}`;
-  if (to) return `Until ${shortDate(to)}`;
+  if (from && to) return `${formatDate(from)} – ${formatDate(to)}`;
+  if (from) return `From ${formatDate(from)}`;
+  if (to) return `Until ${formatDate(to)}`;
   return "All";
 }
 
@@ -109,7 +100,7 @@ export function groupEntries(entries: TimeEntry[], filters: EntryFilters): Entry
     const label =
       filters.groupBy === "person"
         ? (entry.logged_by?.full_name ?? "Unknown")
-        : formatDateHeading(entry.date);
+        : formatDate(entry.date);
 
     const group = groups.get(key);
     if (group) group.entries.push(entry);

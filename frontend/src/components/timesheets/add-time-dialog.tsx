@@ -25,17 +25,21 @@ function today(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
+/** The form itself. The Add menu owns the button that opens it. */
 export function AddTimeDialog({
   projectId,
   timesheets,
   selectedId,
+  open,
+  onClose,
 }: {
   projectId: number;
   timesheets: Timesheet[];
   selectedId: number;
+  open: boolean;
+  onClose: () => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [timesheetId, setTimesheetId] = useState(selectedId);
   const [date, setDate] = useState(today());
   const [hours, setHours] = useState("");
@@ -47,15 +51,10 @@ export function AddTimeDialog({
 
   const chosen = timesheets.find((item) => item.id === timesheetId) ?? timesheets[0];
 
-  function close() {
-    setOpen(false);
-    setDate(today());
-    setHours("");
-    setMinutes("");
-    setDescription("");
-    setStatus("none");
-    setError(null);
-  }
+  // No field resetting here: the menu mounts this only while it is open, so
+  // closing discards the whole form and the next open starts from today and
+  // from whichever timesheet the page is showing.
+  const close = onClose;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,19 +80,7 @@ export function AddTimeDialog({
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setTimesheetId(selectedId);
-          setOpen(true);
-        }}
-        className={buttonClass("primary", "sm")}
-      >
-        Add time
-      </button>
-
-      <Dialog open={open} onClose={close} title="Add time">
+    <Dialog open={open} onClose={close} title="Add time">
         <form onSubmit={submit}>
           <div className="grid gap-5 sm:grid-cols-[1fr_auto]">
             <label className="text-sm font-medium">
@@ -201,8 +188,7 @@ export function AddTimeDialog({
               Cancel
             </button>
           </div>
-        </form>
-      </Dialog>
-    </>
+      </form>
+    </Dialog>
   );
 }

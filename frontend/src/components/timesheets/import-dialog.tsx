@@ -1,35 +1,24 @@
 "use client";
 
-import { useState } from "react";
-
 import { ImportPanel } from "@/components/timesheets/import-panel";
-import { buttonClass } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import type { Timesheet } from "@/lib/timesheets";
 
-/** "Upload CSV" as a call to action rather than a panel taking up the page. */
+/** The CSV upload in a dialog. The Add menu owns the button that opens it. */
 export function ImportDialog({
   projectId,
   timesheet,
+  open,
+  onClose,
 }: {
   projectId: number;
   timesheet: Timesheet;
+  open: boolean;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={buttonClass("secondary", "sm")}
-      >
-        Upload CSV
-      </button>
-
-      <Dialog open={open} onClose={() => setOpen(false)} title="Upload a month of time">
-        <ImportPanel projectId={projectId} timesheet={timesheet} bare />
-      </Dialog>
-    </>
+    <Dialog open={open} onClose={onClose} title="Bulk upload time">
+      <ImportPanel projectId={projectId} timesheet={timesheet} bare />
+    </Dialog>
   );
 }

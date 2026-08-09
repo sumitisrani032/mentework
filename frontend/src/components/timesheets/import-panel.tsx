@@ -8,9 +8,13 @@ import {
   type ImportRejection,
   type ImportResult,
   type Timesheet,
+  formatDate,
   formatDuration,
   uploadTimeCsv,
 } from "@/lib/timesheets";
+
+/** Mirrors MAX_ROWS in the backend parser, which is what actually enforces it. */
+const MAX_ROWS = 31;
 
 type Stage =
   | { name: "idle" }
@@ -78,6 +82,7 @@ export function ImportPanel({
           <p className={`text-sm text-muted ${bare ? "" : "mt-1"}`}>
             A CSV with <code className="font-mono text-xs">date</code>,{" "}
             <code className="font-mono text-xs">logged_hours</code>,{" "}
+            <code className="font-mono text-xs">logged_minutes</code>,{" "}
             <code className="font-mono text-xs">description</code> and{" "}
             <code className="font-mono text-xs">status</code>. You will see it before anything is
             saved.
@@ -122,8 +127,18 @@ export function ImportPanel({
           <span className="text-sm font-medium">
             {stage.name === "checking" ? "Checking the file…" : "Drop a CSV here, or browse"}
           </span>
-          <span className="mt-1 text-xs text-muted">Dates as YYYY-MM-DD, hours as 1:40 or 1.5</span>
+          <span className="mt-1 text-xs text-muted">
+            Dates as DD/MM/YYYY, hours as 1:40 or 1.5, minutes as a whole number under 60
+          </span>
         </label>
+      ) : null}
+
+      {stage.name === "idle" || stage.name === "checking" ? (
+        <p className="mt-3 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
+          <span className="font-medium text-foreground">Note:</span> one upload covers at most{" "}
+          {MAX_ROWS} rows of time — a month, a row per day. A longer file is rejected in full
+          rather than partly imported, so split it and upload each month separately.
+        </p>
       ) : null}
 
       {stage.name === "rejected" ? (
@@ -254,7 +269,7 @@ function Preview({
                 }`}
               >
                 <td className="px-3 py-2 font-mono text-xs text-muted">{row.row}</td>
-                <td className="px-3 py-2 font-mono text-xs">{row.date}</td>
+                <td className="px-3 py-2 font-mono text-xs">{formatDate(row.date)}</td>
                 <td className="px-3 py-2">
                   {formatDuration(row.logged_hours, row.logged_mins)}
                 </td>

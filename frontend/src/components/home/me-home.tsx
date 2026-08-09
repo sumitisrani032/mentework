@@ -16,7 +16,7 @@ import {
 import { Container } from "@/components/ui/section";
 import { type MyTimeEntry, fetchMyTime } from "@/lib/me-server";
 import type { Session } from "@/lib/session";
-import { type Project, formatDuration, totalDuration } from "@/lib/timesheets";
+import { type Project, formatDate, formatDuration, totalDuration } from "@/lib/timesheets";
 import { fetchProjects } from "@/lib/timesheets-server";
 
 type IconComponent = (props: { className?: string }) => React.ReactElement;
@@ -40,15 +40,6 @@ function initialsOf(fullName: string): string {
   const words = fullName.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return "?";
   return (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase();
-}
-
-/** yyyy-mm-dd as a compact day. Read in UTC so the date never shifts back one. */
-function shortDate(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
 }
 
 type TimeGroup = {
@@ -251,10 +242,10 @@ function ProjectTable({ projects }: { projects: Project[] }) {
               </Link>
             </td>
             <td className="px-4 py-2 text-right text-xs text-muted">
-              {project.start_date ? shortDate(project.start_date) : "—"}
+              {project.start_date ? formatDate(project.start_date) : "—"}
             </td>
             <td className="px-4 py-2 text-right text-xs text-muted">
-              {project.end_date ? shortDate(project.end_date) : "—"}
+              {project.end_date ? formatDate(project.end_date) : "—"}
             </td>
           </tr>
         ))}
@@ -283,7 +274,7 @@ function TimeGroupRows({ group }: { group: TimeGroup }) {
       <ul className="pb-1">
         {group.entries.map((entry) => (
           <li key={entry.id} className="flex items-baseline gap-3 px-4 py-1.5 text-sm">
-            <span className="w-12 shrink-0 text-xs text-muted">{shortDate(entry.date)}</span>
+            <span className="w-20 shrink-0 text-xs text-muted">{formatDate(entry.date)}</span>
             <span className="min-w-0 flex-1 truncate text-muted">
               {entry.description ?? "No description"}
             </span>

@@ -4,8 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { CreateTimesheet } from "@/components/timesheets/create-timesheet";
 import { EntriesTable } from "@/components/timesheets/entries-table";
-import { AddTimeDialog } from "@/components/timesheets/add-time-dialog";
-import { ImportDialog } from "@/components/timesheets/import-dialog";
+import { AddMenu } from "@/components/timesheets/add-menu";
 import { SummaryPanel } from "@/components/timesheets/summary-panel";
 import {
   type FilterParams,
@@ -102,14 +101,11 @@ export default async function ProjectTimePage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {canLogTime && selected && !selected.archived ? (
-              <>
-                <AddTimeDialog
-                  projectId={project.id}
-                  timesheets={timesheets ?? []}
-                  selectedId={selected.id}
-                />
-                <ImportDialog projectId={project.id} timesheet={selected} />
-              </>
+              <AddMenu
+                projectId={project.id}
+                timesheets={timesheets ?? []}
+                timesheet={selected}
+              />
             ) : null}
             {canCreateTimesheet ? <CreateTimesheet projectId={project.id} /> : null}
           </div>
