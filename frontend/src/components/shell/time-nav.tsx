@@ -32,7 +32,7 @@ export function TimeNav({
         aria-expanded={open}
         className={`flex w-full items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
           active
-            ? "bg-primary/12 font-medium text-foreground"
+            ? "bg-primary/12 font-medium text-foreground hover:bg-primary/20"
             : "text-muted hover:bg-surface-strong hover:text-foreground"
         }`}
       >
@@ -61,7 +61,7 @@ export function TimeNav({
                   aria-current={timesheet.id === activeTimesheetId ? "page" : undefined}
                   className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
                     timesheet.id === activeTimesheetId
-                      ? "font-medium text-primary"
+                      ? "font-medium text-primary hover:bg-primary/12"
                       : "text-muted hover:bg-surface-strong hover:text-foreground"
                   }`}
                 >

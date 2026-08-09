@@ -245,7 +245,7 @@ function RailEntry({ item, active }: { item: RailItem; active: boolean }) {
       aria-current={active ? "page" : undefined}
       className={`${ENTRY_CLASS} transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
         active
-          ? "font-medium text-primary"
+          ? "font-medium text-primary hover:bg-surface-strong"
           : "text-muted hover:bg-surface-strong hover:text-foreground"
       }`}
     >

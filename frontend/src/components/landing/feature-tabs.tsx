@@ -37,7 +37,7 @@ export function FeatureTabs() {
                 onClick={() => setActiveId(feature.id)}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
                   isActive
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary text-primary-foreground hover:bg-primary-hover"
                     : "border border-border text-muted hover:bg-surface hover:text-foreground"
                 }`}
               >

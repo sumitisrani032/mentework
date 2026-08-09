@@ -45,7 +45,10 @@ export function AppShell({
     <div className="flex min-h-full flex-1">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface lg:flex">
         <div className="border-b border-border px-3 py-4">
-          <Link href="/" className="block px-2.5">
+          <Link
+            href="/"
+            className="block rounded-lg px-2.5 py-1 transition-opacity hover:opacity-80"
+          >
             <Logo />
           </Link>
         </div>
@@ -136,7 +139,7 @@ function NavLink({
       aria-current={active ? "page" : undefined}
       className={`${shared} transition-colors ${
         active
-          ? "bg-primary/12 font-medium text-foreground"
+          ? "bg-primary/12 font-medium text-foreground hover:bg-primary/20"
           : "text-muted hover:bg-surface-strong hover:text-foreground"
       }`}
     >

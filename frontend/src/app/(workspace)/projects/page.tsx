@@ -42,7 +42,7 @@ export default async function ProjectsPage({
     <>
       <header className="border-b border-border">
         <Container className="flex h-16 items-center gap-3">
-          <Link href="/">
+          <Link href="/" className="transition-opacity hover:opacity-80">
             <Logo />
           </Link>
           <span className="hidden text-sm text-muted sm:inline">{session.organization.name}</span>

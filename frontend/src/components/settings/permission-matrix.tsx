@@ -120,7 +120,7 @@ export function PermissionMatrix({ matrix }: { matrix: RoleMatrix }) {
               aria-current={isActive}
               className={`rounded-lg border px-3.5 py-3 text-left transition-colors ${
                 isActive
-                  ? "border-primary/50 bg-primary/10"
+                  ? "border-primary/50 bg-primary/10 hover:bg-primary/20"
                   : "border-border hover:bg-surface"
               }`}
             >

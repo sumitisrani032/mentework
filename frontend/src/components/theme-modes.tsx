@@ -80,7 +80,7 @@ export function ThemeModes() {
             aria-pressed={active}
             className={`flex flex-1 flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] transition-colors ${
               active
-                ? "bg-primary/15 font-medium text-primary"
+                ? "bg-primary/15 font-medium text-primary hover:bg-primary/25"
                 : "text-muted hover:bg-surface-strong hover:text-foreground"
             }`}
           >
