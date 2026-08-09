@@ -217,6 +217,50 @@ async def assign_role(
     return assignment
 
 
+async def revoke_role(session: AsyncSession, assignment: UserRole) -> None:
+    """Take one grant away.
+
+    Refused when it is the last thing letting anyone in the organization edit
+    roles: a workspace nobody can administer cannot be repaired from inside it.
+    """
+    if await _is_last_role_manager(session, assignment):
+        raise RbacError(
+            "This is the only role left that can manage roles. "
+            "Grant it to someone else before removing it."
+        )
+    await session.delete(assignment)
+    await session.flush()
+
+
+async def _is_last_role_manager(session: AsyncSession, assignment: UserRole) -> bool:
+    """Whether removing this grant would leave nobody able to edit roles."""
+    organization_id = (await session.get(Role, assignment.role_id)).organization_id
+
+    remaining = await session.execute(
+        select(UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .join(RolePermission, RolePermission.role_id == Role.id)
+        .where(
+            Role.organization_id == organization_id,
+            RolePermission.feature == Feature.ROLES,
+            RolePermission.can_edit.is_(True),
+            UserRole.id != assignment.id,
+        )
+        .limit(1)
+    )
+    if remaining.scalars().first() is not None:
+        return False
+
+    # Nobody else has it — so this grant only matters if it carried the right.
+    granted = await session.execute(
+        select(RolePermission.can_edit).where(
+            RolePermission.role_id == assignment.role_id,
+            RolePermission.feature == Feature.ROLES,
+        )
+    )
+    return bool(granted.scalar_one_or_none())
+
+
 async def accessible_project_ids(
     session: AsyncSession,
     *,

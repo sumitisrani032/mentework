@@ -2,6 +2,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.organization import Organization
+from app.models.project import Project
 from app.models.role import Feature, Role
 
 ROLES_URL = "/api/v1/roles"
@@ -140,3 +141,83 @@ async def test_granting_a_role_needs_the_user_to_be_a_colleague(
     )
 
     assert response.status_code == 404
+
+
+# --- Taking a role away ------------------------------------------------------
+
+
+async def test_a_grant_can_be_removed_without_touching_the_others(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    project: Project,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
+) -> None:
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+    person = await make_user(
+        organization, "dara@acme.test", role=seeded_roles["member"], project_id=project.id
+    )
+    headers = await auth_headers(admin)
+
+    granted = await api_client.post(
+        f"/api/v1/users/{person.id}/roles",
+        json={"role_id": str(seeded_roles["viewer"].id), "project_id": str(project.id)},
+        headers=headers,
+    )
+    assert granted.status_code == 201
+
+    removed = await api_client.delete(
+        f"/api/v1/users/{person.id}/roles/{granted.json()['id']}", headers=headers
+    )
+
+    assert removed.status_code == 204
+    listed = (await api_client.get("/api/v1/users", headers=headers)).json()
+    theirs = next(person_row for person_row in listed if person_row["email"] == "dara@acme.test")
+    assert [grant["role"] for grant in theirs["roles"]] == ["Member"]
+
+
+async def test_the_last_role_manager_cannot_be_removed(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
+) -> None:
+    """A workspace nobody can administer cannot be repaired from inside it."""
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+    headers = await auth_headers(admin)
+    listed = (await api_client.get("/api/v1/users", headers=headers)).json()
+    grant = next(row for row in listed if row["email"] == "ada@acme.test")["roles"][0]
+
+    response = await api_client.delete(
+        f"/api/v1/users/{admin.id}/roles/{grant['id']}", headers=headers
+    )
+
+    assert response.status_code == 400
+    assert "manage roles" in response.json()["detail"]
+
+
+async def test_removing_a_grant_needs_the_roles_permission(
+    api_client: httpx.AsyncClient,
+    organization: Organization,
+    project: Project,
+    seeded_roles: dict[str, Role],
+    make_user,
+    auth_headers,
+) -> None:
+    admin = await make_user(organization, "ada@acme.test", role=seeded_roles["organization-admin"])
+    person = await make_user(
+        organization, "dara@acme.test", role=seeded_roles["member"], project_id=project.id
+    )
+    grant = next(
+        row
+        for row in (await api_client.get("/api/v1/users", headers=await auth_headers(admin))).json()
+        if row["email"] == "dara@acme.test"
+    )["roles"][0]
+
+    response = await api_client.delete(
+        f"/api/v1/users/{person.id}/roles/{grant['id']}", headers=await auth_headers(person)
+    )
+
+    assert response.status_code == 403

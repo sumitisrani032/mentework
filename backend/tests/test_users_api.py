@@ -35,9 +35,9 @@ async def test_an_admin_creates_someone_with_a_role(
     assert response.status_code == 201
     body = response.json()
     assert body["email"] == "new.person@acme.test"  # stored lowercased
-    assert body["roles"] == [
-        {"role": "Organization Admin", "scope": "organization", "project": None}
-    ]
+    assert [
+        {key: grant[key] for key in ("role", "scope", "project")} for grant in body["roles"]
+    ] == [{"role": "Organization Admin", "scope": "organization", "project": None}]
 
 
 async def test_the_new_account_can_sign_in(
@@ -86,9 +86,10 @@ async def test_a_project_role_needs_a_project(
         headers=headers,
     )
     assert with_project.status_code == 201
-    assert with_project.json()["roles"] == [
-        {"role": "Member", "scope": "project", "project": "Website Relaunch"}
-    ]
+    assert [
+        {key: grant[key] for key in ("role", "scope", "project")}
+        for grant in with_project.json()["roles"]
+    ] == [{"role": "Member", "scope": "project", "project": "Website Relaunch"}]
 
     # Rejected last: the failure rolls its transaction back, which would take
     # the fixtures created alongside it in this test with it.

@@ -37,6 +37,7 @@ def _to_read(user: User) -> MemberRead:
         is_active=user.is_active,
         roles=[
             MemberRoleRead(
+                id=assignment.id,
                 role=assignment.role.name,
                 scope=assignment.role.scope,
                 project=assignment.project.name if assignment.project else None,

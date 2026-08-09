@@ -18,6 +18,7 @@ from app.api.deps import DbSession, require_permission
 from app.models.project import Project
 from app.models.role import Feature, Role, RolePermission
 from app.models.user import User
+from app.models.user_role import UserRole
 from app.schemas.rbac import (
     FeatureRead,
     PermissionMatrixUpdate,
@@ -182,3 +183,38 @@ async def grant_role(
         raise HTTPException(status.HTTP_409_CONFLICT, "That role is already granted") from exc
 
     return UserRoleRead.model_validate(assignment)
+
+
+@router.delete(
+    "/users/{user_id}/roles/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Take a role away from a user",
+)
+async def revoke_role(
+    user_id: int,
+    assignment_id: int,
+    current_user: CanEditRoles,
+    db: DbSession,
+) -> None:
+    """Remove one grant, leaving the person's other roles alone.
+
+    People move off projects far more often than they leave, so this takes away
+    a single assignment rather than the whole account.
+    """
+    user = await db.get(User, user_id)
+    if user is None or user.organization_id != current_user.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+
+    assignment = await db.get(UserRole, assignment_id)
+    if assignment is None or assignment.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Role assignment not found")
+    # A grant of another tenant's role cannot belong to our user, but the role
+    # is checked anyway so the endpoint can never reach across organizations.
+    await _get_own_role(db, assignment.role_id, current_user)
+
+    try:
+        await rbac.revoke_role(db, assignment)
+        await db.commit()
+    except rbac.RbacError as exc:
+        await db.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

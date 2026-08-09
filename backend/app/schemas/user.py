@@ -45,6 +45,8 @@ class MemberCreate(BaseModel):
 class MemberRoleRead(BaseModel):
     """One grant a member holds, named rather than as bare ids."""
 
+    # The assignment's own id, so a single grant can be taken away again.
+    id: int
     role: str
     scope: RoleScope
     project: str | None
