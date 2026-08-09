@@ -42,6 +42,17 @@ class MemberCreate(BaseModel):
         return cleaned
 
 
+class MemberUpdate(BaseModel):
+    """Take someone out of the workspace, or put them back.
+
+    Deactivation rather than deletion: their account stops working everywhere,
+    while the time they logged stays attributed to them. Removing the row
+    outright would blank the author of every entry they ever made.
+    """
+
+    is_active: bool
+
+
 class MemberRoleRead(BaseModel):
     """One grant a member holds, named rather than as bare ids."""
 

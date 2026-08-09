@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.organization import Organization
 from app.models.role import Feature, Role, RolePermission, RoleScope
+from app.models.user import User
 from app.models.user_role import UserRole
 
 
@@ -234,21 +235,12 @@ async def revoke_role(session: AsyncSession, assignment: UserRole) -> None:
 
 async def _is_last_role_manager(session: AsyncSession, assignment: UserRole) -> bool:
     """Whether removing this grant would leave nobody able to edit roles."""
-    organization_id = (await session.get(Role, assignment.role_id)).organization_id
+    role = await session.get(Role, assignment.role_id)
+    assert role is not None  # the assignment could not exist without it
 
-    remaining = await session.execute(
-        select(UserRole.user_id)
-        .join(Role, Role.id == UserRole.role_id)
-        .join(RolePermission, RolePermission.role_id == Role.id)
-        .where(
-            Role.organization_id == organization_id,
-            RolePermission.feature == Feature.ROLES,
-            RolePermission.can_edit.is_(True),
-            UserRole.id != assignment.id,
-        )
-        .limit(1)
-    )
-    if remaining.scalars().first() is not None:
+    if await has_role_manager(
+        session, organization_id=role.organization_id, ignoring_assignment=assignment.id
+    ):
         return False
 
     # Nobody else has it — so this grant only matters if it carried the right.
@@ -259,6 +251,39 @@ async def _is_last_role_manager(session: AsyncSession, assignment: UserRole) -> 
         )
     )
     return bool(granted.scalar_one_or_none())
+
+
+async def has_role_manager(
+    session: AsyncSession,
+    *,
+    organization_id: int,
+    ignoring_assignment: int | None = None,
+    ignoring_user: int | None = None,
+) -> bool:
+    """Whether anyone still active in the organization can edit roles.
+
+    The ignore arguments answer "would this still hold after I remove that?"
+    without having to write the change first.
+    """
+    query = (
+        select(UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .join(RolePermission, RolePermission.role_id == Role.id)
+        .join(User, User.id == UserRole.user_id)
+        .where(
+            Role.organization_id == organization_id,
+            RolePermission.feature == Feature.ROLES,
+            RolePermission.can_edit.is_(True),
+            User.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if ignoring_assignment is not None:
+        query = query.where(UserRole.id != ignoring_assignment)
+    if ignoring_user is not None:
+        query = query.where(UserRole.user_id != ignoring_user)
+
+    return (await session.execute(query)).scalars().first() is not None
 
 
 async def accessible_project_ids(

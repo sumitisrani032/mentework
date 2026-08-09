@@ -20,13 +20,15 @@ from app.models.project import Project
 from app.models.role import Feature, Role
 from app.models.user import User
 from app.models.user_role import UserRole
-from app.schemas.user import MemberCreate, MemberRead, MemberRoleRead
+from app.schemas.user import MemberCreate, MemberRead, MemberRoleRead, MemberUpdate
 from app.services import rbac
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 CanViewMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "view"))]
 CanCreateMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "create"))]
+# Taking someone out of the workspace is the delete-level right.
+CanRemoveMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "delete"))]
 
 
 def _to_read(user: User) -> MemberRead:
@@ -118,6 +120,42 @@ async def create_member(
         await db.rollback()
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
+    await db.commit()
+    return _to_read(await _load_member(db, user.id))
+
+
+@router.patch(
+    "/{user_id}",
+    response_model=MemberRead,
+    summary="Take someone out of the workspace, or put them back",
+)
+async def update_member(
+    user_id: int, payload: MemberUpdate, current_user: CanRemoveMembers, db: DbSession
+) -> MemberRead:
+    """Deactivate an account, or restore one.
+
+    Deactivating ends their access everywhere — the token check reads this on
+    every request — while leaving the time they logged attributed to them.
+    """
+    user = await db.get(User, user_id)
+    if user is None or user.organization_id != current_user.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+
+    if user.id == current_user.id and not payload.is_active:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "You cannot deactivate your own account. Ask another administrator.",
+        )
+
+    if not payload.is_active and not await rbac.has_role_manager(
+        db, organization_id=user.organization_id, ignoring_user=user.id
+    ):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "This is the only person left who can manage roles. Give someone else that role first.",
+        )
+
+    user.is_active = payload.is_active
     await db.commit()
     return _to_read(await _load_member(db, user.id))
 
