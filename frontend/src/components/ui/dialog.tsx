@@ -9,6 +9,14 @@ import { useEffect, useRef } from "react";
  * close, inertness of the page behind and the right ARIA semantics without
  * reimplementing any of it.
  */
+// A modal <dialog> is centred by the UA through `margin: auto`, which Tailwind's
+// preflight zeroes along with every other margin — leaving the panel in the
+// top-left corner. m-auto hands the centring back. The height cap keeps a tall
+// form scrollable rather than clipped once it is anchored to the middle.
+const PANEL_CLASS =
+  "m-auto max-h-[calc(100dvh-4rem)] w-[min(48rem,calc(100vw-2rem))] overflow-y-auto rounded-xl " +
+  "border border-border bg-background p-0 text-foreground backdrop:bg-black/50 open:animate-none";
+
 export function Dialog({
   open,
   onClose,
@@ -43,7 +51,7 @@ export function Dialog({
         if (event.target === ref.current) onClose();
       }}
       aria-label={title}
-      className="w-[min(48rem,calc(100vw-2rem))] rounded-xl border border-border bg-background p-0 text-foreground backdrop:bg-black/50 open:animate-none"
+      className={PANEL_CLASS}
     >
       <div onClick={(event) => event.stopPropagation()}>
         <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
