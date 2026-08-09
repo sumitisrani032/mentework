@@ -43,9 +43,14 @@ def test_iso_dates_are_accepted() -> None:
     assert parse_entry_date("2026-10-05", today=TODAY) == date(2026, 10, 5)
 
 
-@pytest.mark.parametrize("raw", ["05/10/2026", "10/05/2026", "5 Oct 2026", "", "2026-13-01"])
-def test_ambiguous_date_formats_are_refused(raw: str) -> None:
-    """05/10 means two different days depending on where you are."""
+@pytest.mark.parametrize("raw", ["05/10/2026", "05-10-2026", "05.10.2026"])
+def test_dates_are_read_day_first(raw: str) -> None:
+    """DD/MM/YYYY is what the workspace shows, so it is what it reads back."""
+    assert parse_entry_date(raw, today=TODAY) == date(2026, 10, 5)
+
+
+@pytest.mark.parametrize("raw", ["5 Oct 2026", "", "2026-13-01", "32/01/2026", "05/13/2026"])
+def test_broken_date_formats_are_refused(raw: str) -> None:
     with pytest.raises(ValueError):
         parse_entry_date(raw, today=TODAY)
 
@@ -122,7 +127,7 @@ def test_every_bad_row_is_reported_with_its_number() -> None:
         csv_bytes(
             "date,logged_hours,description,status\n"
             "2026-10-05,1:40,Fine,billable\n"
-            "05/10/2026,2,Bad date,none\n"
+            "32/13/2026,2,Bad date,none\n"
             "2026-10-07,abc,Bad hours,none\n"
             "2026-10-08,1,Bad status,invoiced\n"
         ),
@@ -139,6 +144,69 @@ def test_every_bad_row_is_reported_with_its_number() -> None:
 
 def test_an_empty_file_is_reported() -> None:
     assert not parse_csv(b"", today=TODAY).ok
+
+
+# --- Hours and minutes ------------------------------------------------------
+
+
+def test_minutes_add_to_the_hours_column() -> None:
+    result = parse_csv(
+        csv_bytes("date,logged_hours,logged_minutes\n05/10/2026,2,30\n"), today=TODAY
+    )
+
+    assert result.ok, result.errors
+    assert result.total_minutes == 150
+
+
+def test_a_minutes_column_alone_is_enough() -> None:
+    """Half an hour is a whole answer; nobody should have to write 0 hours."""
+    result = parse_csv(csv_bytes("date,logged_minutes\n05/10/2026,45\n"), today=TODAY)
+
+    assert result.ok, result.errors
+    assert result.total_minutes == 45
+
+
+@pytest.mark.parametrize("raw", ["60", "90", "-5", "abc", "1.5"])
+def test_out_of_range_minutes_are_refused(raw: str) -> None:
+    result = parse_csv(
+        csv_bytes(f"date,logged_hours,logged_minutes\n05/10/2026,1,{raw}\n"), today=TODAY
+    )
+
+    assert not result.ok
+    assert result.errors[0].column == "logged_minutes"
+
+
+def test_a_file_with_no_duration_column_is_refused() -> None:
+    result = parse_csv(csv_bytes("date,description\n05/10/2026,Work\n"), today=TODAY)
+
+    assert not result.ok
+    assert "logged_hours" in result.errors[0].message
+    assert "logged_minutes" in result.errors[0].message
+
+
+# --- The 31-row ceiling -----------------------------------------------------
+
+
+def month_of(rows: int) -> bytes:
+    """A file of `rows` valid days, each one hour, walking backwards from TODAY."""
+    lines = ["date,logged_hours"]
+    lines += [f"{day:02d}/10/2026,1" for day in range(1, rows + 1)]
+    return csv_bytes("\n".join(lines) + "\n")
+
+
+def test_thirty_one_rows_are_accepted() -> None:
+    """A full month is the point of the feature, so the ceiling must not bite."""
+    result = parse_csv(month_of(31), today=TODAY)
+
+    assert result.ok, result.errors
+    assert len(result.entries) == 31
+
+
+def test_more_than_thirty_one_rows_is_refused() -> None:
+    result = parse_csv(month_of(31) + b"01/10/2026,1\n", today=TODAY)
+
+    assert not result.ok
+    assert "31" in result.errors[0].message
 
 
 # --- The endpoint -----------------------------------------------------------
@@ -354,4 +422,6 @@ async def test_the_template_can_be_downloaded(
     )
 
     assert response.status_code == 200
-    assert response.text.splitlines()[0] == "date,logged_hours,description,status"
+    assert (
+        response.text.splitlines()[0] == "date,logged_hours,logged_minutes,description,status"
+    )

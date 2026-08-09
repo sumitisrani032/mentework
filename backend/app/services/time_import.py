@@ -8,19 +8,25 @@ a list of what to fix, so a single bad row rejects the file.
 import csv
 import io
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 
 from app.models.timesheet import TimeEntryStatus
 
-# A month of daily entries is a few dozen rows; this is a generous ceiling that
-# still stops a single request from tying up the server.
-MAX_ROWS = 1000
+# An upload covers at most a month, one row per day, so 31 is the ceiling. It
+# doubles as the guard that stops a single request from tying up the server.
+# The header is not counted: this is 31 rows of time.
+MAX_ROWS = 31
 MAX_BYTES = 2 * 1024 * 1024
 
 # One entry cannot be longer than a day.
 MAX_MINUTES_PER_ENTRY = 24 * 60
 
-REQUIRED_COLUMNS = ("date", "logged_hours")
+REQUIRED_COLUMNS = ("date",)
+
+# The duration can arrive as hours, as minutes, or as both added together, so
+# no single one of these is required — but a file with neither has no time in
+# it at all.
+DURATION_COLUMNS = ("logged_hours", "logged_minutes")
 
 # People export these files from all sorts of tools, so accept the obvious
 # spellings rather than making them rename columns.
@@ -32,6 +38,12 @@ COLUMN_ALIASES = {
     "hours": "logged_hours",
     "time": "logged_hours",
     "duration": "logged_hours",
+    "logged_minutes": "logged_minutes",
+    "logged_mins": "logged_minutes",
+    "log_minutes": "logged_minutes",
+    "log_mins": "logged_minutes",
+    "minutes": "logged_minutes",
+    "mins": "logged_minutes",
     "description": "description",
     "notes": "description",
     "note": "description",
@@ -42,9 +54,9 @@ COLUMN_ALIASES = {
 }
 
 TEMPLATE = (
-    "date,logged_hours,description,status\n"
-    "2026-10-05,1:40,Brainstorm session with potential users,billable\n"
-    "2026-10-06,2.5,Drafted the onboarding emails,none\n"
+    "date,logged_hours,logged_minutes,description,status\n"
+    "05/10/2026,1,40,Brainstorm session with potential users,billable\n"
+    "06/10/2026,2,30,Drafted the onboarding emails,none\n"
 )
 
 
@@ -123,24 +135,65 @@ def parse_duration(raw: str) -> int:
     return round(hours_decimal * 60)
 
 
-def parse_entry_date(raw: str, *, today: date) -> date:
-    """Read an ISO date.
+DATE_HINT = "use DD/MM/YYYY, e.g. 05/10/2026"
 
-    Only ``YYYY-MM-DD`` is accepted. ``05/10/2026`` is deliberately refused
-    because it means two different days either side of the Atlantic, and
-    guessing wrong would silently misfile a month of work.
+# Day-first, which is what the workspace displays and therefore what people
+# type back. Slashes, dashes and dots all get used as separators in practice.
+DAY_FIRST_FORMATS = ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y")
+
+
+def parse_entry_date(raw: str, *, today: date) -> date:
+    """Read a date written day-first.
+
+    ``05/10/2026`` is the fifth of October. This used to be refused as
+    ambiguous — it means two different days either side of the Atlantic — but
+    the workspace now states DD/MM/YYYY as its format everywhere it shows a
+    date, so reading it back the same way is the consistent choice rather than
+    a guess. ISO ``YYYY-MM-DD`` still parses: it is unambiguous, and it is what
+    most spreadsheets export.
     """
     value = raw.strip()
     if not value:
         raise ValueError("no date given")
-    try:
-        parsed = date.fromisoformat(value)
-    except ValueError as exc:
-        raise ValueError(f"{value!r} is not a date; use YYYY-MM-DD, e.g. 2026-10-05") from exc
+
+    parsed: date | None = None
+    for pattern in DAY_FIRST_FORMATS:
+        try:
+            parsed = datetime.strptime(value, pattern).date()
+            break
+        except ValueError:
+            continue
+
+    if parsed is None:
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError(f"{value!r} is not a date; {DATE_HINT}") from exc
 
     if parsed > today:
         raise ValueError("is in the future; time cannot be logged before it is spent")
     return parsed
+
+
+def parse_minutes(raw: str) -> int:
+    """Read the standalone minutes column, which adds to the hours column.
+
+    Held below 60 for the same reason ``1:75`` is refused: a row saying two
+    hours and ninety minutes is a mistake being made, not a duration.
+    """
+    value = raw.strip()
+    if not value:
+        return 0
+    try:
+        minutes = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{value!r} is not a whole number of minutes") from exc
+
+    if minutes < 0:
+        raise ValueError("cannot be negative")
+    if minutes >= 60:
+        raise ValueError("must be below 60; carry them into the hours")
+    return minutes
 
 
 def parse_status(raw: str) -> TimeEntryStatus:
@@ -177,13 +230,17 @@ def parse_csv(content: bytes, *, today: date) -> ParseResult:
 
     headers = [normalise_header(name) for name in reader.fieldnames]
     missing = [column for column in REQUIRED_COLUMNS if column not in headers]
+    if not any(column in headers for column in DURATION_COLUMNS):
+        missing.append(" or ".join(DURATION_COLUMNS))
     if missing:
         result.errors.append(RowError(1, "header", f"missing column(s): {', '.join(missing)}"))
         return result
 
     for index, raw_row in enumerate(reader, start=2):  # row 1 is the header
         if len(result.entries) + len(result.errors) >= MAX_ROWS:
-            result.errors.append(RowError(index, "file", f"more than {MAX_ROWS} rows"))
+            result.errors.append(
+                RowError(index, "file", f"has more than {MAX_ROWS} rows of time")
+            )
             break
 
         row = {
@@ -203,15 +260,29 @@ def parse_csv(content: bytes, *, today: date) -> ParseResult:
             row_errors.append(RowError(index, "date", str(exc)))
             entry_date = today
 
-        try:
-            minutes = parse_duration(row.get("logged_hours", ""))
+        # Hours and minutes are two halves of one duration: either column alone
+        # is a complete answer, and together they add up.
+        minutes = 0
+        given = False
+        readable = True
+        for column, read in (("logged_hours", parse_duration), ("logged_minutes", parse_minutes)):
+            raw_value = row.get(column, "")
+            if not raw_value.strip():
+                continue
+            given = True
+            try:
+                minutes += read(raw_value)
+            except ValueError as exc:
+                row_errors.append(RowError(index, column, str(exc)))
+                readable = False
+
+        if not given:
+            row_errors.append(RowError(index, "logged_hours", "no time given"))
+        elif readable:
             if minutes <= 0:
                 row_errors.append(RowError(index, "logged_hours", "must be more than zero"))
             elif minutes > MAX_MINUTES_PER_ENTRY:
                 row_errors.append(RowError(index, "logged_hours", "is longer than 24 hours"))
-        except ValueError as exc:
-            row_errors.append(RowError(index, "logged_hours", str(exc)))
-            minutes = 0
 
         try:
             status = parse_status(row.get("status", ""))

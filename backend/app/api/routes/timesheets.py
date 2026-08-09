@@ -296,7 +296,10 @@ async def import_time_entries(
     project: CanLogTime,
     current_user: CurrentUser,
     db: DbSession,
-    file: Annotated[UploadFile, File(description="CSV: date, logged_hours, description, status")],
+    file: Annotated[
+        UploadFile,
+        File(description="CSV: date, logged_hours, logged_minutes, description, status"),
+    ],
     dry_run: Annotated[bool, Query(description="Validate without saving")] = False,
     allow_duplicates: Annotated[
         bool, Query(description="Log rows that match time already recorded")
