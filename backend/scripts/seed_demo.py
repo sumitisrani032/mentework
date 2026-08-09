@@ -50,6 +50,16 @@ PROJECTS = [
         "start_date": date(2026, 10, 1),
         "end_date": date(2027, 3, 31),
     },
+    # Left without a team or any logged time on purpose: `npm run db:seed:storefront`
+    # fills it, and needs the project to exist first.
+    {
+        "key": "STO",
+        "name": "Storefront Revamp",
+        "description": "Storefront and checkout work for the retail client.",
+        "status": ProjectStatus.ACTIVE,
+        "start_date": date(2026, 7, 1),
+        "end_date": date(2026, 12, 31),
+    },
 ]
 
 

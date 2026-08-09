@@ -30,6 +30,8 @@ DEMO_SLUG = "acme"
 DEMO_PASSWORD = "mentework"
 PROJECT_KEY = "STO"
 TIMESHEET_TITLE = "Storefront Timesheet"
+# A month of five people at roughly six hours a day.
+TIMESHEET_ESTIMATE_MINUTES = 200 * 60
 
 MONTH = (2026, 7)
 
@@ -124,13 +126,28 @@ async def main() -> None:
             ),
             f"No project with key {PROJECT_KEY!r}.",
         )
-        timesheet = await _require(
-            session,
-            select(Timesheet)
-            .where(Timesheet.project_id == project.id, Timesheet.title == TIMESHEET_TITLE)
-            .options(selectinload(Timesheet.assignees)),
-            f"No timesheet titled {TIMESHEET_TITLE!r} in {project.name}.",
-        )
+        # Created on first run rather than required: after `npm run db:seed` the
+        # project is there but empty, and a seed that cannot seed is no use.
+        timesheet = (
+            await session.execute(
+                select(Timesheet)
+                .where(Timesheet.project_id == project.id, Timesheet.title == TIMESHEET_TITLE)
+                .options(selectinload(Timesheet.assignees))
+            )
+        ).scalar_one_or_none()
+
+        if timesheet is None:
+            timesheet = Timesheet(
+                project_id=project.id,
+                title=TIMESHEET_TITLE,
+                estimated_minutes=TIMESHEET_ESTIMATE_MINUTES,
+                # Private, so the assignees below are what makes it visible.
+                is_private=True,
+                creator_id=project.owner_id,
+            )
+            session.add(timesheet)
+            await session.flush()
+            await session.refresh(timesheet, ["assignees"])
 
         roles = {role.slug: role for role in await list_roles(session, organization.id)}
         password = hash_password(DEMO_PASSWORD)
