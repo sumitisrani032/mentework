@@ -63,6 +63,8 @@ export function applyFilters(entries: TimeEntry[], filters: EntryFilters): TimeE
     if (filters.from && entry.date < filters.from) return false;
     if (filters.to && entry.date > filters.to) return false;
     if (filters.status !== "all" && entry.status !== filters.status) return false;
+    // loggedBy arrives off the query string, so it is compared as text — an
+    // id is a number now, and number !== string is true for every entry.
     if (filters.loggedBy && String(entry.logged_by?.id) !== filters.loggedBy) return false;
     return true;
   });

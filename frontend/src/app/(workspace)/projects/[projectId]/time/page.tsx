@@ -47,10 +47,13 @@ export default async function ProjectTimePage({
     redirect("/login");
   }
 
+  // Route and query segments are always text; ids are numbers. Converting once
+  // here keeps every comparison below a number-to-number one.
   const { projectId } = await params;
   const query = await searchParams;
   const { timesheet: timesheetParam } = query;
   const filters = parseFilters(query);
+  const selectedId = Number(timesheetParam);
 
   const projects = await fetchProjects();
   const project = projects.find((item) => item.id === Number(projectId));
@@ -70,7 +73,7 @@ export default async function ProjectTimePage({
   const canCreateTimesheet = timesheetPermission.create;
 
   const selected =
-    timesheets?.find((item) => item.id === Number(timesheetParam)) ??
+    timesheets?.find((item) => item.id === selectedId) ??
     timesheets?.find((item) => !item.archived) ??
     null;
   const entries = selected ? await fetchTimeEntries(project.id, selected.id) : [];
