@@ -20,7 +20,7 @@ export async function fetchProjects(): Promise<Project[]> {
  * Null distinguishes "you cannot see this project" from "it has none", so the
  * page can say which.
  */
-export async function fetchTimesheets(projectId: number): Promise<Timesheet[] | null> {
+export async function fetchTimesheets(projectId: string): Promise<Timesheet[] | null> {
   try {
     const response = await apiFetch(`/api/v1/projects/${projectId}/timesheets`);
     if (!response.ok) return null;
@@ -31,7 +31,7 @@ export async function fetchTimesheets(projectId: number): Promise<Timesheet[] | 
 }
 
 /** What the signed-in user may do in this project, so the UI can hide the rest. */
-export async function fetchProjectPermissions(projectId: number): Promise<ProjectPermissions> {
+export async function fetchProjectPermissions(projectId: string): Promise<ProjectPermissions> {
   try {
     const response = await apiFetch(`/api/v1/projects/${projectId}/permissions`);
     if (!response.ok) return {};
@@ -43,8 +43,8 @@ export async function fetchProjectPermissions(projectId: number): Promise<Projec
 
 /** The time already logged against a timesheet, oldest first. */
 export async function fetchTimeEntries(
-  projectId: number,
-  timesheetId: number,
+  projectId: string,
+  timesheetId: string,
 ): Promise<TimeEntry[]> {
   try {
     const response = await apiFetch(

@@ -16,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin, IntPrimaryKeyMixin
+from app.db.base import Base, IntPrimaryKeyMixin, PublicIdMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.project import Project
@@ -31,7 +31,7 @@ class TimeEntryStatus(enum.StrEnum):
     BILLED = "billed"
 
 
-class Timesheet(IntPrimaryKeyMixin, TimestampMixin, Base):
+class Timesheet(IntPrimaryKeyMixin, PublicIdMixin, TimestampMixin, Base):
     """A named bucket of time within one project.
 
     Only the *estimate* is stored. Logged, billable and billed totals are

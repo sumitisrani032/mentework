@@ -36,7 +36,7 @@ export function ImportPanel({
   // Inside a dialog the surrounding card and heading are already provided.
   bare = false,
 }: {
-  projectId: number;
+  projectId: string;
   timesheet: Timesheet;
   bare?: boolean;
 }) {

@@ -24,7 +24,7 @@ export type NewMember = {
   password: string;
   role_id: number;
   /** One grant per project. Empty for an organisation-wide role. */
-  project_ids: number[];
+  project_ids: string[];
 };
 
 /**
@@ -37,7 +37,7 @@ export type NewMember = {
 export async function grantRole(
   userId: number,
   roleId: number,
-  projectIds: number[],
+  projectIds: string[],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   for (const projectId of projectIds.length > 0 ? projectIds : [null]) {
     const response = await fetch(`/api/users/${userId}/roles`, {

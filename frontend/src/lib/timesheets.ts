@@ -1,5 +1,6 @@
 export type Project = {
-  id: number;
+  /** The project's public id — a UUID. The row key never reaches the browser. */
+  id: string;
   name: string;
   key: string;
   description: string | null;
@@ -21,21 +22,22 @@ export type CreateProjectInput = {
 /** Create a project. The API also puts the creator on it as Project Manager. */
 export async function createProject(
   input: CreateProjectInput,
-): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const response = await fetch("/api/projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   const payload = await response.json().catch(() => null);
-  if (response.ok) return { ok: true, id: (payload as { id: number }).id };
+  if (response.ok) return { ok: true, id: (payload as { id: string }).id };
   return { ok: false, error: describeError(payload) ?? `Could not create (${response.status}).` };
 }
 
 export type Timesheet = {
-  id: number;
+  /** Public id, as with a project. */
+  id: string;
   title: string;
-  project_id: number;
+  project_id: string;
   estimated_hours: number | null;
   estimated_mins: number | null;
   logged_hours: number | null;
@@ -174,8 +176,8 @@ export type NewTimeEntry = {
 
 /** Log one entry against a timesheet. */
 export async function createTimeEntry(
-  projectId: number,
-  timesheetId: number,
+  projectId: string,
+  timesheetId: string,
   entry: NewTimeEntry,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const response = await fetch(`/api/projects/${projectId}/timesheets/${timesheetId}/time`, {
@@ -197,13 +199,13 @@ export type TimeEntryPatch = {
   description?: string | null;
 };
 
-function entryUrl(projectId: number, timesheetId: number, entryId: number): string {
+function entryUrl(projectId: string, timesheetId: string, entryId: number): string {
   return `/api/projects/${projectId}/timesheets/${timesheetId}/time/${entryId}`;
 }
 
 export async function updateTimeEntry(
-  projectId: number,
-  timesheetId: number,
+  projectId: string,
+  timesheetId: string,
   entryId: number,
   patch: TimeEntryPatch,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -219,8 +221,8 @@ export async function updateTimeEntry(
 }
 
 export async function deleteTimeEntry(
-  projectId: number,
-  timesheetId: number,
+  projectId: string,
+  timesheetId: string,
   entryId: number,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const response = await fetch(entryUrl(projectId, timesheetId, entryId), { method: "DELETE" });
@@ -239,9 +241,9 @@ export type CreateTimesheetInput = {
 
 /** Create a timesheet through this app's route handler, which holds the session. */
 export async function createTimesheet(
-  projectId: number,
+  projectId: string,
   input: CreateTimesheetInput,
-): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const response = await fetch(`/api/projects/${projectId}/timesheets`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -250,7 +252,7 @@ export async function createTimesheet(
 
   const payload = await response.json().catch(() => null);
   if (response.ok) {
-    return { ok: true, id: (payload as { id: number }).id };
+    return { ok: true, id: (payload as { id: string }).id };
   }
 
   const detail = (payload as { detail?: unknown } | null)?.detail;
@@ -269,8 +271,8 @@ export async function createTimesheet(
  * token is httpOnly, so the browser cannot call the API itself.
  */
 export async function uploadTimeCsv(
-  projectId: number,
-  timesheetId: number,
+  projectId: string,
+  timesheetId: string,
   file: File,
   options: { dryRun: boolean; allowDuplicates?: boolean },
 ): Promise<ImportOutcome> {

@@ -177,14 +177,24 @@ async def grant_role(
 
     role = await _get_own_role(db, payload.role_id, current_user)
 
+    # The payload names the project by its public id; the grant is written
+    # against the row key, as every other project reference is.
+    project = None
     if payload.project_id is not None:
-        project = await db.get(Project, payload.project_id)
-        if project is None or project.organization_id != current_user.organization_id:
+        project = (
+            await db.execute(
+                select(Project).where(
+                    Project.public_id == payload.project_id,
+                    Project.organization_id == current_user.organization_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if project is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
 
     try:
         assignment = await rbac.assign_role(
-            db, user_id=user.id, role=role, project_id=payload.project_id
+            db, user_id=user.id, role=role, project_id=project.id if project else None
         )
         await db.commit()
     except rbac.RbacError as exc:
@@ -194,7 +204,14 @@ async def grant_role(
         await db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "That role is already granted") from exc
 
-    return UserRoleRead.model_validate(assignment)
+    # Built by hand rather than from the row: the response says project_id, and
+    # out here that means the public one.
+    return UserRoleRead(
+        id=assignment.id,
+        user_id=assignment.user_id,
+        role_id=assignment.role_id,
+        project_id=project.public_id if project else None,
+    )
 
 
 @router.delete(

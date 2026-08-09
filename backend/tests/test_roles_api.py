@@ -162,7 +162,7 @@ async def test_a_grant_can_be_removed_without_touching_the_others(
 
     granted = await api_client.post(
         f"/api/v1/users/{person.id}/roles",
-        json={"role_id": str(seeded_roles["viewer"].id), "project_id": str(project.id)},
+        json={"role_id": str(seeded_roles["viewer"].id), "project_id": str(project.public_id)},
         headers=headers,
     )
     assert granted.status_code == 201

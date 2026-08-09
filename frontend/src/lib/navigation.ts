@@ -16,7 +16,7 @@ export type NavItem = {
   built: boolean;
 };
 
-export function projectNav(projectId: number): NavItem[] {
+export function projectNav(projectId: string): NavItem[] {
   return [
     { key: "tasks", label: "Tasks", feature: "tasks", built: false },
     { key: "discussions", label: "Discussions", feature: "discussions", built: false },

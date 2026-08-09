@@ -30,14 +30,14 @@ export function AssignRole({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [roleId, setRoleId] = useState(roles[0]?.id ?? 0);
-  const [projectIds, setProjectIds] = useState<number[]>([]);
+  const [projectIds, setProjectIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   const role = roles.find((candidate) => candidate.id === roleId);
   const needsProject = role?.scope === "project";
 
-  function toggleProject(id: number) {
+  function toggleProject(id: string) {
     setProjectIds((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );

@@ -47,8 +47,8 @@ export function EntriesTable({
   people,
   params,
 }: {
-  projectId: number;
-  timesheetId: number;
+  projectId: string;
+  timesheetId: string;
   /** Already narrowed by `filters`; the menu only decides what arrives here. */
   entries: TimeEntry[];
   permission: FeaturePermission;
@@ -209,8 +209,8 @@ function ReadRow({
   onCancelDelete,
   onError,
 }: {
-  projectId: number;
-  timesheetId: number;
+  projectId: string;
+  timesheetId: string;
   entry: TimeEntry;
   mayChange: boolean;
   mayRemove: boolean;
@@ -315,8 +315,8 @@ function EditRow({
   onDone,
   onError,
 }: {
-  projectId: number;
-  timesheetId: number;
+  projectId: string;
+  timesheetId: string;
   entry: TimeEntry;
   onDone: () => void;
   onError: (message: string | null) => void;

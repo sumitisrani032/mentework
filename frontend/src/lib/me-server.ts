@@ -5,8 +5,8 @@ import type { TimeEntry } from "@/lib/timesheets";
 
 /** An entry as the cross-project listing returns it: with where it was logged. */
 export type MyTimeEntry = TimeEntry & {
-  project: { id: number; name: string };
-  timesheet: { id: number; title: string };
+  project: { id: string; name: string };
+  timesheet: { id: string; title: string };
 };
 
 /**

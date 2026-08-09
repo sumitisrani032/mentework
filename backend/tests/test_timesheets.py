@@ -9,7 +9,7 @@ from app.services.timesheets import split_minutes, to_minutes
 
 
 def url(project: Project, *parts: int | str) -> str:
-    return "/".join([f"/api/v1/projects/{project.id}/timesheets", *map(str, parts)])
+    return "/".join([f"/api/v1/projects/{project.public_id}/timesheets", *map(str, parts)])
 
 
 @pytest.fixture
@@ -312,3 +312,37 @@ async def test_assignees_must_be_in_the_same_organization(
     )
 
     assert response.status_code == 400
+
+
+# --- Public identifiers -----------------------------------------------------
+
+
+async def test_the_row_id_does_not_open_a_project(
+    api_client: httpx.AsyncClient, project: Project, manager, auth_headers
+) -> None:
+    """The BIGINT key is internal. Handing it to the API gets you nowhere."""
+    response = await api_client.get(
+        f"/api/v1/projects/{project.id}/timesheets", headers=await auth_headers(manager)
+    )
+
+    # 422 rather than 404: it is not a public id at all, so it never gets as
+    # far as a lookup.
+    assert response.status_code == 422
+
+
+async def test_a_timesheet_reports_public_ids_and_no_row_keys(
+    api_client: httpx.AsyncClient, project: Project, manager, auth_headers
+) -> None:
+    headers = await auth_headers(manager)
+    created = await api_client.post(url(project), json={"title": "Research"}, headers=headers)
+
+    body = created.json()
+    assert body["project_id"] == str(project.public_id)
+    # The timesheet's own id is a public one, and nothing in the payload is the
+    # small integer a reader could count with.
+    assert body["id"] != 1
+    assert len(body["id"]) == 36
+
+    fetched = await api_client.get(url(project, body["id"]), headers=headers)
+    assert fetched.status_code == 200
+    assert fetched.json()["id"] == body["id"]

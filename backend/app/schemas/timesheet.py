@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -25,9 +26,10 @@ class TimesheetCreate(BaseModel):
 
 
 class TimesheetRead(BaseModel):
-    id: int
+    # Public ids out here: a browser is given these and never the row keys.
+    id: uuid.UUID
     title: str
-    project_id: int
+    project_id: uuid.UUID
 
     estimated_hours: int | None
     estimated_mins: int | None
@@ -137,7 +139,7 @@ class TimeEntryUpdate(BaseModel):
 class TimeEntryTimesheetRead(BaseModel):
     """The nested timesheet summary returned alongside each entry."""
 
-    id: int
+    id: uuid.UUID
     title: str
     assigned: list[int]
     private: bool
@@ -149,7 +151,7 @@ class TimeEntryTimesheetRead(BaseModel):
 
 
 class TimeEntryProjectRead(BaseModel):
-    id: int
+    id: uuid.UUID
     name: str
 
 

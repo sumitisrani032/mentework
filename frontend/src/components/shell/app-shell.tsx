@@ -31,7 +31,7 @@ export function AppShell({
   organizationPermissions: ProjectPermissions;
   active: string;
   timesheets?: Timesheet[];
-  activeTimesheetId?: number | null;
+  activeTimesheetId?: string | null;
   children: React.ReactNode;
 }) {
   const projectItems = project

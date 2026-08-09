@@ -33,9 +33,9 @@ export function AddTimeDialog({
   open,
   onClose,
 }: {
-  projectId: number;
+  projectId: string;
   timesheets: Timesheet[];
-  selectedId: number;
+  selectedId: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -87,7 +87,7 @@ export function AddTimeDialog({
               Timesheet
               <select
                 value={timesheetId}
-                onChange={(event) => setTimesheetId(Number(event.target.value))}
+                onChange={(event) => setTimesheetId(event.target.value)}
                 className={FIELD_CLASS}
               >
                 {timesheets

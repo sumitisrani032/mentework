@@ -81,7 +81,7 @@ async def test_a_project_role_needs_a_project(
         json=member_payload(
             email="dara@acme.test",
             role_id=str(seeded_roles["member"].id),
-            project_ids=[str(project.id)],
+            project_ids=[str(project.public_id)],
         ),
         headers=headers,
     )
@@ -119,7 +119,7 @@ async def test_one_role_can_cover_several_projects(
         "/api/v1/users",
         json=member_payload(
             role_id=str(seeded_roles["member"].id),
-            project_ids=[str(project.id), str(second.id)],
+            project_ids=[str(project.public_id), str(second.public_id)],
         ),
         headers=await auth_headers(admin),
     )
@@ -142,7 +142,7 @@ async def test_the_same_project_twice_is_not_an_error(
         "/api/v1/users",
         json=member_payload(
             role_id=str(seeded_roles["member"].id),
-            project_ids=[str(project.id), str(project.id)],
+            project_ids=[str(project.public_id), str(project.public_id)],
         ),
         headers=await auth_headers(admin),
     )
@@ -162,7 +162,7 @@ async def test_an_organization_role_cannot_name_projects(
         "/api/v1/users",
         json=member_payload(
             role_id=str(seeded_roles["organization-admin"].id),
-            project_ids=[str(project.id)],
+            project_ids=[str(project.public_id)],
         ),
         headers=await auth_headers(admin),
     )
@@ -321,13 +321,13 @@ async def test_their_logged_time_survives_deactivation(
     admin_headers = await auth_headers(admin)
     sheet = (
         await api_client.post(
-            f"/api/v1/projects/{project.id}/timesheets",
+            f"/api/v1/projects/{project.public_id}/timesheets",
             json={"title": "August"},
             headers=admin_headers,
         )
     ).json()
     await api_client.post(
-        f"/api/v1/projects/{project.id}/timesheets/{sheet['id']}/time",
+        f"/api/v1/projects/{project.public_id}/timesheets/{sheet['id']}/time",
         json={"date": "2026-08-03", "logged_hours": 3},
         headers=await auth_headers(colleague),
     )
@@ -338,7 +338,8 @@ async def test_their_logged_time_survives_deactivation(
 
     entries = (
         await api_client.get(
-            f"/api/v1/projects/{project.id}/timesheets/{sheet['id']}/time", headers=admin_headers
+            f"/api/v1/projects/{project.public_id}/timesheets/{sheet['id']}/time",
+            headers=admin_headers,
         )
     ).json()
     assert [entry["logged_by"]["full_name"] for entry in entries] == ["Dara"]
@@ -420,13 +421,13 @@ async def test_deleting_someone_keeps_their_entries_but_not_their_name(
     admin_headers = await auth_headers(admin)
     sheet = (
         await api_client.post(
-            f"/api/v1/projects/{project.id}/timesheets",
+            f"/api/v1/projects/{project.public_id}/timesheets",
             json={"title": "August"},
             headers=admin_headers,
         )
     ).json()
     await api_client.post(
-        f"/api/v1/projects/{project.id}/timesheets/{sheet['id']}/time",
+        f"/api/v1/projects/{project.public_id}/timesheets/{sheet['id']}/time",
         json={"date": "2026-08-03", "logged_hours": 3},
         headers=await auth_headers(colleague),
     )
@@ -435,7 +436,8 @@ async def test_deleting_someone_keeps_their_entries_but_not_their_name(
 
     entries = (
         await api_client.get(
-            f"/api/v1/projects/{project.id}/timesheets/{sheet['id']}/time", headers=admin_headers
+            f"/api/v1/projects/{project.public_id}/timesheets/{sheet['id']}/time",
+            headers=admin_headers,
         )
     ).json()
     assert len(entries) == 1
@@ -448,14 +450,14 @@ async def test_the_listing_counts_what_a_deletion_would_orphan(
     admin_headers = await auth_headers(admin)
     sheet = (
         await api_client.post(
-            f"/api/v1/projects/{project.id}/timesheets",
+            f"/api/v1/projects/{project.public_id}/timesheets",
             json={"title": "August"},
             headers=admin_headers,
         )
     ).json()
     for day in ("2026-08-03", "2026-08-04"):
         await api_client.post(
-            f"/api/v1/projects/{project.id}/timesheets/{sheet['id']}/time",
+            f"/api/v1/projects/{project.public_id}/timesheets/{sheet['id']}/time",
             json={"date": day, "logged_hours": 1},
             headers=await auth_headers(colleague),
         )

@@ -28,7 +28,7 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [roleId, setRoleId] = useState(roles[0]?.id ?? 0);
-  const [projectIds, setProjectIds] = useState<number[]>([]);
+  const [projectIds, setProjectIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -45,7 +45,7 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
     setError(null);
   }
 
-  function toggleProject(id: number) {
+  function toggleProject(id: string) {
     setProjectIds((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );

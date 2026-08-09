@@ -11,7 +11,7 @@ export function ImportDialog({
   open,
   onClose,
 }: {
-  projectId: number;
+  projectId: string;
   timesheet: Timesheet;
   open: boolean;
   onClose: () => void;

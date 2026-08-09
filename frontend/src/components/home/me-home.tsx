@@ -50,7 +50,7 @@ type TimeGroup = {
 
 /** Gather entries under the timesheet they were logged against, order kept. */
 function groupByTimesheet(entries: MyTimeEntry[]): TimeGroup[] {
-  const groups = new Map<number, TimeGroup>();
+  const groups = new Map<string, TimeGroup>();
   for (const entry of entries) {
     const group = groups.get(entry.timesheet.id);
     if (group) group.entries.push(entry);

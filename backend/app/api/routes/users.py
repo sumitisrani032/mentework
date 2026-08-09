@@ -6,6 +6,7 @@ caller's own organization, so one tenant can neither see nor add people in
 another.
 """
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -104,9 +105,9 @@ async def create_member(
     role = await _own_role(db, payload.role_id, current_user)
     # Deduplicated: the same project twice would collide on the uniqueness
     # constraint over (user, role, project) and read as a server error.
-    project_ids = list(dict.fromkeys(payload.project_ids))
-    for project_id in project_ids:
-        await _own_project(db, project_id, current_user)
+    public_ids = list(dict.fromkeys(payload.project_ids))
+    # Resolved once here; everything below grants against the row keys.
+    project_ids = [(await _own_project(db, public_id, current_user)).id for public_id in public_ids]
 
     user = User(
         organization_id=current_user.organization_id,
@@ -213,8 +214,16 @@ async def _own_role(db: AsyncSession, role_id: int, actor: User) -> Role:
     return role
 
 
-async def _own_project(db: AsyncSession, project_id: int, actor: User) -> Project:
-    project = await db.get(Project, project_id)
-    if project is None or project.organization_id != actor.organization_id:
+async def _own_project(db: AsyncSession, project_id: uuid.UUID, actor: User) -> Project:
+    """Exchange a project's public id for the row, inside the caller's tenant."""
+    project = (
+        await db.execute(
+            select(Project).where(
+                Project.public_id == project_id,
+                Project.organization_id == actor.organization_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if project is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
     return project

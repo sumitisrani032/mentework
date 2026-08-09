@@ -1,3 +1,4 @@
+import uuid
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -72,8 +73,10 @@ class RoleMatrixRead(BaseModel):
 
 class UserRoleCreate(BaseModel):
     role_id: int
-    # Required for project-scoped roles, rejected for organization-scoped ones.
-    project_id: int | None = None
+    # The project's public id: this arrives from a browser, which is never
+    # given a row key. Required for project-scoped roles, rejected for
+    # organization-scoped ones.
+    project_id: uuid.UUID | None = None
 
 
 class UserRoleRead(BaseModel):
@@ -82,4 +85,4 @@ class UserRoleRead(BaseModel):
     id: int
     user_id: int
     role_id: int
-    project_id: int | None
+    project_id: uuid.UUID | None

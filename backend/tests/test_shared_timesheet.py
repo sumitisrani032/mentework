@@ -28,7 +28,7 @@ async def team(organization, project, seeded_roles, make_user):
 
 
 def base(project: Project) -> str:
-    return f"/api/v1/projects/{project.id}/timesheets"
+    return f"/api/v1/projects/{project.public_id}/timesheets"
 
 
 async def test_every_member_sees_the_whole_teams_time(

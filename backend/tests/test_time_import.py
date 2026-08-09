@@ -230,7 +230,7 @@ async def manager(organization, project, seeded_roles, make_user):
 async def timesheet_id(api_client, project, manager, auth_headers) -> str:
     """A timesheet the manager set up; uploading into one is a separate right."""
     created = await api_client.post(
-        f"/api/v1/projects/{project.id}/timesheets",
+        f"/api/v1/projects/{project.public_id}/timesheets",
         json={"title": "October"},
         headers=await auth_headers(manager),
     )
@@ -238,7 +238,7 @@ async def timesheet_id(api_client, project, manager, auth_headers) -> str:
 
 
 def import_url(project: Project, timesheet_id: str) -> str:
-    return f"/api/v1/projects/{project.id}/timesheets/{timesheet_id}/time/import"
+    return f"/api/v1/projects/{project.public_id}/timesheets/{timesheet_id}/time/import"
 
 
 async def test_a_member_can_upload_a_month_of_time(
@@ -264,7 +264,7 @@ async def test_a_member_can_upload_a_month_of_time(
     assert (body["logged_hours"], body["logged_mins"]) == (4, 40)
 
     listed = await api_client.get(
-        f"/api/v1/projects/{project.id}/timesheets/{timesheet_id}/time", headers=headers
+        f"/api/v1/projects/{project.public_id}/timesheets/{timesheet_id}/time", headers=headers
     )
     assert len(listed.json()) == 3
 
@@ -292,7 +292,7 @@ async def test_one_bad_row_rejects_the_whole_file(
 
     # Nothing was written, not even the good row.
     listed = await api_client.get(
-        f"/api/v1/projects/{project.id}/timesheets/{timesheet_id}/time", headers=headers
+        f"/api/v1/projects/{project.public_id}/timesheets/{timesheet_id}/time", headers=headers
     )
     assert listed.json() == []
 
@@ -316,7 +316,7 @@ async def test_uploading_the_same_file_twice_does_not_double_count(
     assert second.json()["skipped_duplicates"] == 1
 
     listed = await api_client.get(
-        f"/api/v1/projects/{project.id}/timesheets/{timesheet_id}/time", headers=headers
+        f"/api/v1/projects/{project.public_id}/timesheets/{timesheet_id}/time", headers=headers
     )
     assert len(listed.json()) == 1
 
@@ -367,7 +367,7 @@ async def test_a_dry_run_validates_without_saving(
     ]
 
     listed = await api_client.get(
-        f"/api/v1/projects/{project.id}/timesheets/{timesheet_id}/time", headers=headers
+        f"/api/v1/projects/{project.public_id}/timesheets/{timesheet_id}/time", headers=headers
     )
     assert listed.json() == []
 
@@ -417,7 +417,7 @@ async def test_the_template_can_be_downloaded(
     api_client: httpx.AsyncClient, project: Project, member, auth_headers
 ) -> None:
     response = await api_client.get(
-        f"/api/v1/projects/{project.id}/timesheets/import-template",
+        f"/api/v1/projects/{project.public_id}/timesheets/import-template",
         headers=await auth_headers(member),
     )
 

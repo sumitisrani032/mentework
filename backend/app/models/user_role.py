@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import BigInteger, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin, IntPrimaryKeyMixin
+from app.db.base import Base, IntPrimaryKeyMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.project import Project

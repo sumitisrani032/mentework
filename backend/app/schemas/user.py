@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -31,7 +32,7 @@ class MemberCreate(BaseModel):
     # A project-scoped role can cover several projects at once — someone is
     # rarely on exactly one. One grant is written per project. Required for a
     # project-scoped role, rejected for an organization-wide one.
-    project_ids: list[int] = Field(default_factory=list)
+    project_ids: list[uuid.UUID] = Field(default_factory=list)
 
     @field_validator("email")
     @classmethod

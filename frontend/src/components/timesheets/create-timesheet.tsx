@@ -11,7 +11,7 @@ const FIELD_CLASS =
   "placeholder:text-muted/70 focus-visible:outline-2 focus-visible:outline-offset-1 " +
   "focus-visible:outline-ring";
 
-export function CreateTimesheet({ projectId }: { projectId: number }) {
+export function CreateTimesheet({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");

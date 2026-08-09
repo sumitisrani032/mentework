@@ -1,6 +1,8 @@
+import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, func
+from sqlalchemy import BigInteger, DateTime, func, text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -29,6 +31,31 @@ class IntPrimaryKeyMixin:
         BigInteger,
         primary_key=True,
         autoincrement=True,
+    )
+
+
+class PublicIdMixin:
+    """Adds the identifier this row is known by outside the server.
+
+    The BIGINT primary key stays where it is and keeps every join, but it never
+    leaves the server: it is guessable and it counts rows. What reaches a
+    browser — the address bar, the JSON it reads, the requests it sends — is
+    this UUID instead.
+
+    Version 4 specifically. A time-ordered UUID sorts by creation time, which
+    hands back the ordering this exists to hide.
+
+    Defaulted on both sides: the ORM fills it on insert, and the column
+    default covers raw SQL, seeds and imports that never build a model.
+    """
+
+    public_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=False,
+        unique=True,
+        index=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
     )
 
 

@@ -14,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin, IntPrimaryKeyMixin
+from app.db.base import Base, IntPrimaryKeyMixin, PublicIdMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
@@ -29,7 +29,7 @@ class ProjectStatus(enum.StrEnum):
     ARCHIVED = "archived"
 
 
-class Project(IntPrimaryKeyMixin, TimestampMixin, Base):
+class Project(IntPrimaryKeyMixin, PublicIdMixin, TimestampMixin, Base):
     """A unit of work inside an organization.
 
     Role assignments can be scoped to a project, so this is also the boundary

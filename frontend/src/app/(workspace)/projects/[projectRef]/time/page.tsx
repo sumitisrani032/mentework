@@ -39,7 +39,7 @@ export default async function ProjectTimePage({
   params,
   searchParams,
 }: {
-  params: Promise<{ projectId: string }>;
+  params: Promise<{ projectRef: string }>;
   searchParams: Promise<{ timesheet?: string } & FilterParams>;
 }) {
   const session = await getSession();
@@ -47,16 +47,15 @@ export default async function ProjectTimePage({
     redirect("/login");
   }
 
-  // Route and query segments are always text; ids are numbers. Converting once
-  // here keeps every comparison below a number-to-number one.
-  const { projectId } = await params;
+  // Both the path segment and the query carry public ids, which are already
+  // text — nothing to convert, and nothing here reveals a row key.
+  const { projectRef } = await params;
   const query = await searchParams;
-  const { timesheet: timesheetParam } = query;
+  const { timesheet: selectedId } = query;
   const filters = parseFilters(query);
-  const selectedId = Number(timesheetParam);
 
   const projects = await fetchProjects();
-  const project = projects.find((item) => item.id === Number(projectId));
+  const project = projects.find((item) => item.id === projectRef);
   if (!project) {
     notFound();
   }

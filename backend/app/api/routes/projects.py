@@ -5,6 +5,7 @@ organization-wide, or through a role granted on that specific project.
 """
 
 import re
+import uuid
 from datetime import date
 from typing import Annotated
 
@@ -28,9 +29,11 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 class ProjectRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    # A caller knows a project by its public id and by nothing else, so that is
+    # what `id` means out here. The BIGINT key never leaves the server.
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: int
+    id: uuid.UUID = Field(validation_alias="public_id")
     name: str
     key: str
     description: str | None

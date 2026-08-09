@@ -22,7 +22,7 @@ export function AddMenu({
   timesheets,
   timesheet,
 }: {
-  projectId: number;
+  projectId: string;
   timesheets: Timesheet[];
   /** The timesheet on screen — what a bulk upload lands in. */
   timesheet: Timesheet;

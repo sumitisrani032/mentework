@@ -5,6 +5,7 @@ Member on one project cannot log time against another. Private timesheets are
 filtered further — see ``app.services.timesheets.may_see``.
 """
 
+import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -68,7 +69,7 @@ async def _can_manage_time(db: AsyncSession, user: User, project_id: int) -> boo
 
 
 async def _load_timesheet(
-    db: AsyncSession, project: Project, timesheet_id: int, user: User
+    db: AsyncSession, project: Project, timesheet_id: uuid.UUID, user: User
 ) -> Timesheet:
     """Fetch a timesheet, hiding it entirely when it is not visible.
 
@@ -78,7 +79,7 @@ async def _load_timesheet(
     """
     result = await db.execute(
         select(Timesheet)
-        .where(Timesheet.id == timesheet_id, Timesheet.project_id == project.id)
+        .where(Timesheet.public_id == timesheet_id, Timesheet.project_id == project.id)
         .options(selectinload(Timesheet.assignees))
     )
     timesheet = result.scalar_one_or_none()
@@ -91,7 +92,9 @@ async def _load_timesheet(
     return timesheet
 
 
-def _to_read(timesheet: Timesheet, totals: service.Totals, viewer_id: int) -> TimesheetRead:
+def _to_read(
+    timesheet: Timesheet, totals: service.Totals, viewer_id: int, project: Project
+) -> TimesheetRead:
     estimated_hours, estimated_mins = service.split_minutes(timesheet.estimated_minutes)
     logged_hours, logged_mins = service.split_minutes(totals.logged)
     billable_hours, billable_mins = service.split_minutes(totals.billable)
@@ -101,9 +104,9 @@ def _to_read(timesheet: Timesheet, totals: service.Totals, viewer_id: int) -> Ti
     )
 
     return TimesheetRead(
-        id=timesheet.id,
+        id=timesheet.public_id,
         title=timesheet.title,
-        project_id=timesheet.project_id,
+        project_id=project.public_id,
         estimated_hours=estimated_hours,
         estimated_mins=estimated_mins,
         logged_hours=logged_hours,
@@ -144,7 +147,7 @@ async def read_timesheets(
     ]
 
     totals = await service.totals_for(db, [timesheet.id for timesheet in visible])
-    return [_to_read(sheet, totals[sheet.id], current_user.id) for sheet in visible]
+    return [_to_read(sheet, totals[sheet.id], current_user.id, project) for sheet in visible]
 
 
 @router.post(
@@ -173,8 +176,8 @@ async def create_timesheet(
     db.add(timesheet)
     await db.commit()
 
-    reloaded = await _load_timesheet(db, project, timesheet.id, current_user)
-    return _to_read(reloaded, service.Totals(), current_user.id)
+    reloaded = await _load_timesheet(db, project, timesheet.public_id, current_user)
+    return _to_read(reloaded, service.Totals(), current_user.id, project)
 
 
 # Declared before "/{timesheet_id}": routes match in order, so a literal path
@@ -193,14 +196,14 @@ async def read_import_template(project: CanViewTimesheets) -> PlainTextResponse:
 
 @router.get("/{timesheet_id}", response_model=TimesheetRead, summary="Read a single timesheet")
 async def read_timesheet(
-    timesheet_id: int,
+    timesheet_id: uuid.UUID,
     project: CanViewTimesheets,
     current_user: CurrentUser,
     db: DbSession,
 ) -> TimesheetRead:
     timesheet = await _load_timesheet(db, project, timesheet_id, current_user)
     totals = await service.totals_for(db, [timesheet.id])
-    return _to_read(timesheet, totals[timesheet.id], current_user.id)
+    return _to_read(timesheet, totals[timesheet.id], current_user.id, project)
 
 
 @router.get(
@@ -209,7 +212,7 @@ async def read_timesheet(
     summary="List the time logged on a timesheet",
 )
 async def read_time_entries(
-    timesheet_id: int,
+    timesheet_id: uuid.UUID,
     project: CanViewTimesheets,
     current_user: CurrentUser,
     db: DbSession,
@@ -254,7 +257,7 @@ async def _authors_of(db: AsyncSession, entries: list[TimeEntry]) -> dict[int, U
     summary="Log time against a timesheet",
 )
 async def create_time_entry(
-    timesheet_id: int,
+    timesheet_id: uuid.UUID,
     payload: TimeEntryCreate,
     project: CanLogTime,
     current_user: CurrentUser,
@@ -292,7 +295,7 @@ async def create_time_entry(
     summary="Bulk-upload logged time from a CSV",
 )
 async def import_time_entries(
-    timesheet_id: int,
+    timesheet_id: uuid.UUID,
     project: CanLogTime,
     current_user: CurrentUser,
     db: DbSession,
@@ -380,7 +383,7 @@ def _preview_row(entry: time_import.ParsedEntry, duplicate: bool) -> ImportPrevi
 async def _load_entry(
     db: AsyncSession,
     project: Project,
-    timesheet_id: int,
+    timesheet_id: uuid.UUID,
     entry_id: int,
     user: User,
     *,
@@ -416,7 +419,7 @@ async def _load_entry(
     summary="Change a logged time entry",
 )
 async def update_time_entry(
-    timesheet_id: int,
+    timesheet_id: uuid.UUID,
     entry_id: int,
     payload: TimeEntryUpdate,
     project: CanEditTime,
@@ -457,7 +460,7 @@ async def update_time_entry(
     summary="Remove a logged time entry",
 )
 async def delete_time_entry(
-    timesheet_id: int,
+    timesheet_id: uuid.UUID,
     entry_id: int,
     project: CanDeleteTime,
     current_user: CurrentUser,
@@ -537,7 +540,7 @@ def entry_to_read(
         logged_mins=logged_mins,
         timer=entry.from_timer,
         by_me=entry.creator_id == viewer_id,
-        project=TimeEntryProjectRead(id=project.id, name=project.name),
+        project=TimeEntryProjectRead(id=project.public_id, name=project.name),
         creator_id=entry.creator_id,
         logged_by=LoggedByRead(
             id=logged_by.id,
@@ -547,7 +550,7 @@ def entry_to_read(
         if logged_by is not None
         else None,
         timesheet=TimeEntryTimesheetRead(
-            id=timesheet.id,
+            id=timesheet.public_id,
             title=timesheet.title,
             assigned=service.assignee_ids(timesheet),
             private=timesheet.is_private,

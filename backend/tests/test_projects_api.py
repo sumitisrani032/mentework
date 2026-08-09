@@ -74,7 +74,7 @@ async def test_project_permissions_describe_what_the_caller_may_do(
     )
 
     response = await api_client.get(
-        f"/api/v1/projects/{project.id}/permissions", headers=await auth_headers(member)
+        f"/api/v1/projects/{project.public_id}/permissions", headers=await auth_headers(member)
     )
 
     assert response.status_code == 200
@@ -107,7 +107,7 @@ async def test_project_permissions_are_refused_on_another_tenants_project(
     )
 
     response = await api_client.get(
-        f"/api/v1/projects/{theirs.id}/permissions", headers=await auth_headers(member)
+        f"/api/v1/projects/{theirs.public_id}/permissions", headers=await auth_headers(member)
     )
 
     assert response.status_code == 404

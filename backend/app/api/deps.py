@@ -1,10 +1,12 @@
 """Shared request dependencies."""
 
+import uuid
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any, Literal
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import InvalidToken, decode_access_token
@@ -94,19 +96,32 @@ def require_project_permission(
 ) -> Callable[..., Coroutine[Any, Any, Project]]:
     """Require a permission inside the project named in the path.
 
-    Resolves ``project_id`` and returns the project, so routes do not fetch it
-    again. A project in another organization is reported as missing rather than
+    The path carries the project's public id. This is the one place it is
+    exchanged for the row — a single lookup on a unique index, no join — and
+    everything downstream works from ``project.id`` as before.
+
+    Resolves the project and returns it, so routes do not fetch it again. A
+    project in another organization is reported as missing rather than
     forbidden, so the endpoint cannot be used to probe which ids exist.
     """
 
     async def dependency(
-        project_id: int, current_user: CurrentUser, db: DbSession
+        project_id: uuid.UUID, current_user: CurrentUser, db: DbSession
     ) -> Project:
-        project = await db.get(Project, project_id)
-        if project is None or project.organization_id != current_user.organization_id:
+        project = (
+            await db.execute(
+                select(Project).where(
+                    Project.public_id == project_id,
+                    # Scoped to the caller's tenant as well as the id: a public
+                    # id is unguessable, but isolation should not rest on that.
+                    Project.organization_id == current_user.organization_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if project is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
 
-        granted = await effective_permissions(db, user_id=current_user.id, project_id=project_id)
+        granted = await effective_permissions(db, user_id=current_user.id, project_id=project.id)
         if not getattr(granted[feature], action):
             raise _forbidden(feature, action)
         return project

@@ -17,9 +17,9 @@ export function TimeNav({
   activeTimesheetId,
   active,
 }: {
-  projectId: number;
+  projectId: string;
   timesheets: Timesheet[];
-  activeTimesheetId: number | null;
+  activeTimesheetId: string | null;
   active: boolean;
 }) {
   const [open, setOpen] = useState(active);

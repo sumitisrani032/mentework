@@ -27,7 +27,7 @@ async def second_project(db_session, organization: Organization) -> Project:
 
 
 def timesheets_url(project: Project) -> str:
-    return f"/api/v1/projects/{project.id}/timesheets"
+    return f"/api/v1/projects/{project.public_id}/timesheets"
 
 
 async def log_time(
