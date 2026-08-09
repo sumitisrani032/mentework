@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AssignRole } from "@/components/settings/assign-role";
 import { CreateMember } from "@/components/settings/create-member";
+import { RoleChip } from "@/components/settings/role-chip";
 import { Container } from "@/components/ui/section";
 import { fetchMembers } from "@/lib/members-server";
 import { fetchRoleMatrix } from "@/lib/roles-server";
@@ -115,17 +116,14 @@ export default async function MembersPage() {
                         {member.roles.length === 0 ? (
                           <span className="text-muted">No role yet</span>
                         ) : (
-                          <span className="flex flex-wrap gap-1.5">
-                            {member.roles.map((grant, index) => (
-                              <span
-                                key={`${grant.role}-${grant.project ?? "org"}-${index}`}
-                                className="rounded-full border border-border px-2 py-0.5 text-xs"
-                              >
-                                {grant.role}
-                                {grant.project ? (
-                                  <span className="text-muted"> · {grant.project}</span>
-                                ) : null}
-                              </span>
+                          <span className="flex flex-wrap items-start gap-1.5">
+                            {member.roles.map((grant) => (
+                              <RoleChip
+                                key={grant.id}
+                                member={member}
+                                grant={grant}
+                                removable={canAssignRoles}
+                              />
                             ))}
                           </span>
                         )}

@@ -1,6 +1,8 @@
 import { describeError } from "@/lib/rbac";
 
 export type MemberRole = {
+  /** The assignment's id, which is what a removal names. */
+  id: number;
   role: string;
   scope: "organization" | "project";
   project: string | null;
@@ -51,6 +53,21 @@ export async function grantRole(
     }
   }
   return { ok: true };
+}
+
+/** Take one grant away, leaving the person's other roles alone. */
+export async function revokeRole(
+  userId: number,
+  assignmentId: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const response = await fetch(`/api/users/${userId}/roles/${assignmentId}`, { method: "DELETE" });
+  if (response.ok) return { ok: true };
+
+  const payload = await response.json().catch(() => null);
+  return {
+    ok: false,
+    error: describeError(payload) ?? `Could not remove this role (${response.status}).`,
+  };
 }
 
 /** Create an account and grant it the role it was created for. */
