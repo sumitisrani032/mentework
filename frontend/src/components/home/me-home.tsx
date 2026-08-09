@@ -11,12 +11,10 @@ import {
   GridIcon,
   MegaphoneIcon,
   NoteIcon,
-  ShieldIcon,
   Widget,
 } from "@/components/home/widget";
 import { Container } from "@/components/ui/section";
 import { type MyTimeEntry, fetchMyTime } from "@/lib/me-server";
-import { ACTIONS, ACTION_LABELS } from "@/lib/rbac";
 import type { Session } from "@/lib/session";
 import { type Project, formatDuration, totalDuration } from "@/lib/timesheets";
 import { fetchProjects } from "@/lib/timesheets-server";
@@ -87,7 +85,6 @@ export async function MeHome({ session }: { session: Session }) {
   const [projects, entries] = await Promise.all([fetchProjects(), fetchMyTime(20)]);
   const groups = groupByTimesheet(entries);
   const firstName = session.user.full_name.split(" ")[0];
-  const visiblePermissions = session.permissions.filter((permission) => permission.can_view);
 
   return (
     <main className="flex-1">
@@ -192,32 +189,6 @@ export async function MeHome({ session }: { session: Session }) {
           )}
         </Widget>
 
-        <Widget
-          title="What you can access"
-          icon={ShieldIcon}
-          wide
-          action={
-            <span className="flex flex-wrap gap-1.5">
-              {session.roles.map((role) => (
-                <span
-                  key={role}
-                  className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted"
-                >
-                  {role}
-                </span>
-              ))}
-            </span>
-          }
-        >
-          {visiblePermissions.length === 0 ? (
-            <Empty icon={ShieldIcon}>
-              Your roles do not grant organisation-wide access to any area yet. Project roles still
-              apply inside their own project.
-            </Empty>
-          ) : (
-            <PermissionTable permissions={visiblePermissions} />
-          )}
-        </Widget>
       </Container>
     </main>
   );
@@ -326,45 +297,3 @@ function TimeGroupRows({ group }: { group: TimeGroup }) {
   );
 }
 
-function PermissionTable({ permissions }: { permissions: Session["permissions"] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-border text-xs text-muted">
-            <th scope="col" className="px-4 py-2 text-left font-medium">
-              Feature
-            </th>
-            {ACTIONS.map((action) => (
-              <th key={action} scope="col" className="px-4 py-2 text-center font-medium">
-                {ACTION_LABELS[action]}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {permissions.map((permission) => (
-            <tr key={permission.feature} className="border-b border-border last:border-b-0">
-              <th scope="row" className="px-4 py-2 text-left font-medium capitalize">
-                {permission.feature.replace("_", " ")}
-              </th>
-              {ACTIONS.map((action) => (
-                <td key={action} className="px-4 py-2 text-center">
-                  {permission[action] ? (
-                    <span className="text-primary" aria-label="allowed">
-                      ✓
-                    </span>
-                  ) : (
-                    <span className="text-muted/40" aria-label="not allowed">
-                      —
-                    </span>
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
