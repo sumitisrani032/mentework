@@ -5,13 +5,17 @@ import { useState } from "react";
 
 import { buttonClass } from "@/components/ui/button";
 import { Avatar } from "@/components/timesheets/avatar";
+import { EntryFilterMenu } from "@/components/timesheets/entry-filters";
+import {
+  type EntryFilters,
+  activeFilterCount,
+  groupEntries,
+} from "@/lib/entry-filters";
 import {
   type FeaturePermission,
   type TimeEntry,
   deleteTimeEntry,
-  formatDateHeading,
   formatDuration,
-  groupByDate,
   totalDuration,
   updateTimeEntry,
 } from "@/lib/timesheets";
@@ -39,24 +43,42 @@ export function EntriesTable({
   timesheetId,
   entries,
   permission,
+  filters,
+  people,
+  params,
 }: {
   projectId: number;
   timesheetId: number;
+  /** Already narrowed by `filters`; the menu only decides what arrives here. */
   entries: TimeEntry[];
   permission: FeaturePermission;
+  filters: EntryFilters;
+  people: { id: number; full_name: string }[];
+  params: Record<string, string>;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const [confirming, setConfirming] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const filtering = activeFilterCount(filters) > 0;
+
   if (entries.length === 0) {
     return (
-      <div className="rounded-xl border border-border bg-surface p-6">
-        <h3 className="font-medium">No time logged yet</h3>
-        <p className="mt-2 text-sm leading-relaxed text-muted">
-          Upload a CSV above, and the entries will appear here.
-        </p>
-      </div>
+      <section>
+        <div className="flex items-center justify-end">
+          <EntryFilterMenu filters={filters} people={people} params={params} />
+        </div>
+        <div className="mt-3 rounded-xl border border-border bg-surface p-6">
+          <h3 className="font-medium">
+            {filtering ? "Nothing matches these filters" : "No time logged yet"}
+          </h3>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            {filtering
+              ? "Widen the date range, or clear the filters to see the whole timesheet."
+              : "Upload a CSV above, and the entries will appear here."}
+          </p>
+        </div>
+      </section>
     );
   }
 
@@ -67,19 +89,23 @@ export function EntriesTable({
 
   return (
     <section>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-medium">
           Logged time
           <span className="ml-2 text-sm font-normal text-muted">
             {entries.length} {entries.length === 1 ? "entry" : "entries"}
+            {filtering ? " shown" : ""}
           </span>
         </h3>
-        <p className="text-sm text-muted">
-          Total{" "}
-          <span className="font-medium text-foreground">
-            {formatDuration(total.hours, total.mins)}
-          </span>
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted">
+            Total{" "}
+            <span className="font-medium text-foreground">
+              {formatDuration(total.hours, total.mins)}
+            </span>
+          </p>
+          <EntryFilterMenu filters={filters} people={people} params={params} />
+        </div>
       </div>
 
       {error ? (
@@ -109,15 +135,15 @@ export function EntriesTable({
               </th>
             </tr>
           </thead>
-          {groupByDate(entries).map((day) => (
-            <tbody key={day.date}>
+          {groupEntries(entries, filters).map((day) => (
+            <tbody key={day.key}>
               <tr className="border-b border-border bg-surface/60">
                 <th
                   scope="colgroup"
                   colSpan={4}
                   className="px-4 py-2 text-left text-xs font-semibold tracking-wide uppercase"
                 >
-                  {formatDateHeading(day.date)}
+                  {day.label}
                 </th>
                 <td className="px-4 py-2 text-right text-xs text-muted">
                   {formatDuration(

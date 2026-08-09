@@ -7,6 +7,12 @@ import { EntriesTable } from "@/components/timesheets/entries-table";
 import { AddTimeDialog } from "@/components/timesheets/add-time-dialog";
 import { ImportDialog } from "@/components/timesheets/import-dialog";
 import { SummaryPanel } from "@/components/timesheets/summary-panel";
+import {
+  type FilterParams,
+  applyFilters,
+  parseFilters,
+  peopleIn,
+} from "@/lib/entry-filters";
 import { getSession, organizationPermissions } from "@/lib/session";
 import { NO_PERMISSION, formatDuration } from "@/lib/timesheets";
 import {
@@ -35,7 +41,7 @@ export default async function ProjectTimePage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ timesheet?: string }>;
+  searchParams: Promise<{ timesheet?: string } & FilterParams>;
 }) {
   const session = await getSession();
   if (!session) {
@@ -43,7 +49,9 @@ export default async function ProjectTimePage({
   }
 
   const { projectId } = await params;
-  const { timesheet: timesheetParam } = await searchParams;
+  const query = await searchParams;
+  const { timesheet: timesheetParam } = query;
+  const filters = parseFilters(query);
 
   const projects = await fetchProjects();
   const project = projects.find((item) => item.id === Number(projectId));
@@ -132,8 +140,13 @@ export default async function ProjectTimePage({
               <EntriesTable
                 projectId={project.id}
                 timesheetId={selected.id}
-                entries={entries}
+                entries={applyFilters(entries, filters)}
                 permission={timesheetPermission}
+                filters={filters}
+                people={peopleIn(entries)}
+                params={Object.fromEntries(
+                  Object.entries(query).filter(([, value]) => typeof value === "string"),
+                )}
               />
             </div>
 
