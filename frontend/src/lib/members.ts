@@ -55,6 +55,30 @@ export async function grantRole(
   return { ok: true };
 }
 
+/**
+ * Take someone out of the workspace, or put them back.
+ *
+ * Deactivation, not deletion: their access ends everywhere while the time they
+ * logged keeps their name on it.
+ */
+export async function setMemberActive(
+  userId: number,
+  isActive: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const response = await fetch(`/api/users/${userId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_active: isActive }),
+  });
+  if (response.ok) return { ok: true };
+
+  const payload = await response.json().catch(() => null);
+  return {
+    ok: false,
+    error: describeError(payload) ?? `Could not change this account (${response.status}).`,
+  };
+}
+
 /** Take one grant away, leaving the person's other roles alone. */
 export async function revokeRole(
   userId: number,

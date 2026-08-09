@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AssignRole } from "@/components/settings/assign-role";
 import { CreateMember } from "@/components/settings/create-member";
+import { MemberAccess } from "@/components/settings/member-access";
 import { RoleChip } from "@/components/settings/role-chip";
 import { Container } from "@/components/ui/section";
 import { fetchMembers } from "@/lib/members-server";
@@ -37,6 +38,11 @@ export default async function MembersPage() {
   // with the roles permission rather than members.
   const canAssignRoles = session.permissions.some(
     (grant) => grant.feature === "roles" && grant.can_edit,
+  );
+  // Taking someone out of the workspace is the delete-level right, which the
+  // API guards separately from adding them.
+  const canRemovePeople = session.permissions.some(
+    (grant) => grant.feature === "members" && grant.can_delete,
   );
   const needsRoleList = canCreate || canAssignRoles;
 
@@ -95,7 +101,7 @@ export default async function MembersPage() {
                     <th scope="col" className="px-4 py-3 text-left font-semibold">
                       Roles
                     </th>
-                    {canAssignRoles && roles.length > 0 ? (
+                    {(canAssignRoles && roles.length > 0) || canRemovePeople ? (
                       <th scope="col" className="px-4 py-3 text-right font-semibold">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -104,7 +110,12 @@ export default async function MembersPage() {
                 </thead>
                 <tbody>
                   {members.map((member) => (
-                    <tr key={member.id} className="border-b border-border last:border-b-0">
+                    <tr
+                      key={member.id}
+                      className={`border-b border-border last:border-b-0 ${
+                        member.is_active ? "" : "text-muted"
+                      }`}
+                    >
                       <th scope="row" className="px-4 py-2.5 text-left align-top font-medium">
                         {member.full_name}
                         {member.is_active ? null : (
@@ -128,9 +139,16 @@ export default async function MembersPage() {
                           </span>
                         )}
                       </td>
-                      {canAssignRoles && roles.length > 0 ? (
+                      {(canAssignRoles && roles.length > 0) || canRemovePeople ? (
                         <td className="px-4 py-2.5 text-right align-top">
-                          <AssignRole member={member} roles={roles} projects={projects} />
+                          <span className="inline-flex items-start justify-end gap-2">
+                            {canAssignRoles && roles.length > 0 && member.is_active ? (
+                              <AssignRole member={member} roles={roles} projects={projects} />
+                            ) : null}
+                            {canRemovePeople ? (
+                              <MemberAccess member={member} isSelf={member.id === session.user.id} />
+                            ) : null}
+                          </span>
                         </td>
                       ) : null}
                     </tr>
