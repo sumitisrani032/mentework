@@ -64,8 +64,11 @@ export default async function ProjectTimePage({
     fetchProjectPermissions(project.id),
   ]);
 
+  // Two permissions, two jobs: managing the timesheet, and logging time in it.
   const timesheetPermission = permissions.timesheet ?? NO_PERMISSION;
-  const canLogTime = timesheetPermission.create;
+  const timePermission = permissions.time_entry ?? NO_PERMISSION;
+  const canLogTime = timePermission.create;
+  const canCreateTimesheet = timesheetPermission.create;
 
   const selected =
     timesheets?.find((item) => item.id === Number(timesheetParam)) ??
@@ -108,7 +111,7 @@ export default async function ProjectTimePage({
                 <ImportDialog projectId={project.id} timesheet={selected} />
               </>
             ) : null}
-            {canLogTime ? <CreateTimesheet projectId={project.id} /> : null}
+            {canCreateTimesheet ? <CreateTimesheet projectId={project.id} /> : null}
           </div>
         </div>
 
@@ -122,7 +125,7 @@ export default async function ProjectTimePage({
           </Notice>
         ) : timesheets.length === 0 ? (
           <Notice title="No timesheets in this project">
-            {canLogTime
+            {canCreateTimesheet
               ? "Create one with the button above, then log time against it."
               : "Ask someone who can manage timesheets to create one."}
           </Notice>
@@ -141,7 +144,7 @@ export default async function ProjectTimePage({
                 projectId={project.id}
                 timesheetId={selected.id}
                 entries={applyFilters(entries, filters)}
-                permission={timesheetPermission}
+                permission={timePermission}
                 filters={filters}
                 people={peopleIn(entries)}
                 params={Object.fromEntries(
