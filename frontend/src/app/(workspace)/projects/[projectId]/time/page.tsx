@@ -117,7 +117,7 @@ export default async function ProjectTimePage({
 
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="@container flex-1 overflow-y-auto p-6">
         {timesheets === null ? (
           <Notice title="You cannot view time on this project">
             Viewing timesheets needs the <code className="font-mono">timesheet</code> view
@@ -132,7 +132,7 @@ export default async function ProjectTimePage({
         ) : !selected ? (
           <Notice title="Select a timesheet">Choose one above to see the time logged.</Notice>
         ) : (
-          <div className="flex flex-col gap-8 xl:flex-row">
+          <div className="flex flex-col gap-8 @3xl:flex-row">
             <div className="min-w-0 flex-1 space-y-8">
               {selected.archived ? (
                 <Notice title="This timesheet is archived">

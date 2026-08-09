@@ -31,7 +31,7 @@ export function SummaryPanel({ timesheet }: { timesheet: Timesheet }) {
   ];
 
   return (
-    <aside className="w-full shrink-0 xl:w-64">
+    <aside className="w-full shrink-0 @3xl:w-64">
       <h2 className="font-medium">Summary</h2>
       <dl className="mt-3 space-y-2">
         {rows.map((row) => (
