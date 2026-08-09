@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { RangeCalendar } from "@/components/timesheets/range-calendar";
 import { buttonClass } from "@/components/ui/button";
 import { type EntryFilters, activeFilterCount, rangeLabel } from "@/lib/entry-filters";
 
@@ -290,6 +291,13 @@ function DateRangeField({
   const [custom, setCustom] = useState(Boolean(from || to));
   const [start, setStart] = useState(from ?? "");
   const [end, setEnd] = useState(to ?? "");
+  const calendar = useRef<HTMLDivElement>(null);
+
+  // The presets alone can fill a short window, so choosing Custom brings the
+  // calendar into view rather than leaving it below the fold.
+  useEffect(() => {
+    if (custom) calendar.current?.scrollIntoView({ block: "nearest" });
+  }, [custom]);
 
   function choose(preset: (typeof PRESETS)[number]) {
     const range = preset.range();
@@ -312,14 +320,14 @@ function DateRangeField({
       </button>
 
       {open ? (
-        <div className="absolute top-0 right-full z-40 mr-3 max-h-[70vh] w-64 overflow-y-auto rounded-xl border border-border bg-background p-4 shadow-xl">
+        <div className="absolute top-0 right-full z-40 mr-3 max-h-[75vh] w-72 overflow-y-auto rounded-xl border border-border bg-background p-4 shadow-xl">
           <h5 className="font-medium">Date range</h5>
 
-          <div role="radiogroup" aria-label="Date range" className="mt-3 space-y-1">
+          <div role="radiogroup" aria-label="Date range" className="mt-2 space-y-0.5">
             {PRESETS.map((preset) => (
               <label
                 key={preset.key}
-                className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-sm hover:bg-surface"
+                className="flex items-center gap-2.5 rounded-lg px-1.5 py-1 text-sm hover:bg-surface"
               >
                 <input
                   type="radio"
@@ -331,7 +339,7 @@ function DateRangeField({
                 {preset.label}
               </label>
             ))}
-            <label className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-sm hover:bg-surface">
+            <label className="flex items-center gap-2.5 rounded-lg px-1.5 py-1 text-sm hover:bg-surface">
               <input
                 type="radio"
                 name="date-range"
@@ -344,29 +352,19 @@ function DateRangeField({
           </div>
 
           {custom ? (
-            <div className="mt-2 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block text-xs text-muted">
-                  Start
-                  <input
-                    type="date"
-                    value={start}
-                    max={end || undefined}
-                    onChange={(event) => setStart(event.target.value)}
-                    className={`${CONTROL_CLASS} mt-1 w-full border-border text-foreground`}
-                  />
-                </label>
-                <label className="block text-xs text-muted">
-                  End
-                  <input
-                    type="date"
-                    value={end}
-                    min={start || undefined}
-                    onChange={(event) => setEnd(event.target.value)}
-                    className={`${CONTROL_CLASS} mt-1 w-full border-border text-foreground`}
-                  />
-                </label>
-              </div>
+            <div ref={calendar} className="mt-3 space-y-3 border-t border-border pt-3">
+              <RangeCalendar
+                start={start || null}
+                end={end || null}
+                onChange={(nextStart, nextEnd) => {
+                  setStart(nextStart ?? "");
+                  setEnd(nextEnd ?? "");
+                }}
+              />
+
+              <p className="text-center text-xs text-muted">
+                {start ? rangeLabel(start, end || null) : "Pick a start day, then an end day."}
+              </p>
 
               <div className="flex justify-end gap-2">
                 <button
