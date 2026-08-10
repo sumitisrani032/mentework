@@ -74,7 +74,7 @@ export function CreateProject({ defaultOpen = false }: { defaultOpen?: boolean }
   }
 
   return (
-    <form onSubmit={submit} className="w-full rounded-xl border border-border bg-surface p-5">
+    <form method="post" onSubmit={submit} className="w-full rounded-xl border border-border bg-surface p-5">
       <h2 className="font-medium">New project</h2>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">

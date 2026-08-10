@@ -46,7 +46,12 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={submit} className="mt-8 space-y-5">
+    // method="post" is the safety net, not the mechanism: submit() handles the
+    // sign-in. If this component ever fails to hydrate — a chunk that does not
+    // load, JavaScript disabled — the browser submits the form itself, and
+    // without a method that submission is a GET, which writes the password
+    // into the address bar, the history and every access log on the way.
+    <form method="post" onSubmit={submit} className="mt-8 space-y-5">
       <div>
         <label htmlFor="email" className="text-sm font-medium">
           Email

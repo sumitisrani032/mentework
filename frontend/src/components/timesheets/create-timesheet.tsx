@@ -62,6 +62,7 @@ export function CreateTimesheet({ projectId }: { projectId: string }) {
 
   return (
     <form
+      method="post"
       onSubmit={submit}
       className="w-full rounded-xl border border-border bg-surface p-5 sm:max-w-md"
     >

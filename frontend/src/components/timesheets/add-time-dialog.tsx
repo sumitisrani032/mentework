@@ -81,7 +81,7 @@ export function AddTimeDialog({
 
   return (
     <Dialog open={open} onClose={close} title="Add time">
-        <form onSubmit={submit}>
+        <form method="post" onSubmit={submit}>
           <div className="grid gap-5 sm:grid-cols-[1fr_auto]">
             <label className="text-sm font-medium">
               Timesheet

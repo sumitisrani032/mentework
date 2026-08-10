@@ -92,7 +92,7 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
   }
 
   return (
-    <form onSubmit={submit} className="w-full rounded-xl border border-border bg-surface p-5">
+    <form method="post" onSubmit={submit} className="w-full rounded-xl border border-border bg-surface p-5">
       <h2 className="font-medium">Add someone to this workspace</h2>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">

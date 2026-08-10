@@ -48,7 +48,10 @@ export function PasswordForm() {
   }
 
   return (
+    // Never a GET: an unhydrated submit would put both the old and the new
+    // password in the URL. See the note in login-form.tsx.
     <form
+      method="post"
       id="change-password"
       onSubmit={submit}
       className="scroll-mt-6 rounded-xl border border-border bg-surface p-5"

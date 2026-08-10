@@ -37,7 +37,7 @@ export function ProfileForm({ fullName, email }: { fullName: string; email: stri
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border border-border bg-surface p-5">
+    <form method="post" onSubmit={submit} className="rounded-xl border border-border bg-surface p-5">
       <h2 className="font-medium">Profile</h2>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
