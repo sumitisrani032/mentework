@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { buttonClass } from "@/components/ui/button";
+import { DateField } from "@/components/ui/date-field";
 import { Avatar } from "@/components/timesheets/avatar";
 import { EntryFilterMenu } from "@/components/timesheets/entry-filters";
 import {
@@ -355,15 +356,16 @@ function EditRow({
     <tr className="border-b border-border bg-surface last:border-b-0">
       <td colSpan={5} className="px-4 py-3">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="text-xs text-muted">
+          <div className="text-xs text-muted">
             Date
-            <input
-              type="date"
+            <DateField
+              label="Date"
               value={date}
-              onChange={(event) => setDate(event.target.value)}
+              onChange={setDate}
+              required
               className={`${INPUT_CLASS} mt-1 block w-40`}
             />
-          </label>
+          </div>
 
           <label className="text-xs text-muted">
             Time

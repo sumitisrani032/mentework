@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { buttonClass } from "@/components/ui/button";
+import { DateField } from "@/components/ui/date-field";
 import { createProject } from "@/lib/timesheets";
 
 const FIELD_CLASS =
@@ -132,25 +133,25 @@ export function CreateProject({ defaultOpen = false }: { defaultOpen?: boolean }
           </select>
         </label>
 
-        <label className="text-sm font-medium">
+        <div className="text-sm font-medium">
           Starts <span className="font-normal text-muted">(optional)</span>
-          <input
-            type="date"
+          <DateField
+            label="Starts"
             value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
+            onChange={setStartDate}
             className={FIELD_CLASS}
           />
-        </label>
+        </div>
 
-        <label className="text-sm font-medium">
+        <div className="text-sm font-medium">
           Ends <span className="font-normal text-muted">(optional)</span>
-          <input
-            type="date"
+          <DateField
+            label="Ends"
             value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
+            onChange={setEndDate}
             className={FIELD_CLASS}
           />
-        </label>
+        </div>
       </div>
 
       {error ? (

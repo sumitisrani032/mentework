@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Dialog } from "@/components/ui/dialog";
 import { buttonClass } from "@/components/ui/button";
+import { DateField } from "@/components/ui/date-field";
 import { type Timesheet, createTimeEntry, formatDuration } from "@/lib/timesheets";
 
 const FIELD_CLASS =
@@ -109,16 +110,16 @@ export function AddTimeDialog({
           </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            <label className="text-sm font-medium">
+            <div className="text-sm font-medium">
               Date
-              <input
-                type="date"
-                required
+              <DateField
+                label="Date"
                 value={date}
-                onChange={(event) => setDate(event.target.value)}
+                onChange={setDate}
+                required
                 className={FIELD_CLASS}
               />
-            </label>
+            </div>
             <label className="text-sm font-medium">
               Hours
               <input
