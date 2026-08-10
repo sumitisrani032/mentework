@@ -3,6 +3,20 @@
 A multi-tenant SaaS project-management workspace. Each customer organisation
 gets its own subdomain and its own isolated data.
 
+## Documentation
+
+This file is the tour. [`docs/`](docs/README.md) is the reference.
+
+| | |
+| --- | --- |
+| [Local setup](docs/local-setup.md) | Prerequisites, commands, troubleshooting |
+| [Demo accounts](docs/demo-accounts.md) | The 12 seeded logins and what each one shows |
+| [Architecture](docs/architecture.md) | How the pieces fit, with sequence and flow diagrams |
+| [API reference](docs/api-reference.md) | All 32 endpoints, grouped, with the rules across them |
+| [Database](docs/database.md) | ERD, every column and type, every constraint |
+| [Authorization](docs/authorization.md) | Roles, the permission matrix, how a check runs |
+| [Features](docs/features.md) | What is built, what is not |
+
 ## Stack
 
 | Layer       | Technology                                     |
