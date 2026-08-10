@@ -22,13 +22,20 @@ from app.models.role import Feature, Role
 from app.models.timesheet import TimeEntry
 from app.models.user import User
 from app.models.user_role import UserRole
-from app.schemas.user import MemberCreate, MemberRead, MemberRoleRead, MemberUpdate
+from app.schemas.user import (
+    MemberCreate,
+    MemberProfileUpdate,
+    MemberRead,
+    MemberRoleRead,
+    MemberUpdate,
+)
 from app.services import rbac
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 CanViewMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "view"))]
 CanCreateMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "create"))]
+CanEditMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "edit"))]
 # Taking someone out of the workspace is the delete-level right.
 CanRemoveMembers = Annotated[User, Depends(require_permission(Feature.MEMBERS, "delete"))]
 
@@ -138,6 +145,28 @@ async def create_member(
         await db.rollback()
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
+    await db.commit()
+    return _to_read(await _load_member(db, user.id))
+
+
+@router.patch(
+    "/{user_id}/profile",
+    response_model=MemberRead,
+    summary="Correct someone's name",
+)
+async def update_member_profile(
+    user_id: int, payload: MemberProfileUpdate, current_user: CanEditMembers, db: DbSession
+) -> MemberRead:
+    """Change a name that was typed wrong, or one that has since changed.
+
+    The edit-level right rather than the delete-level one that deactivation
+    needs: correcting a name takes nothing away from anybody.
+    """
+    user = await db.get(User, user_id)
+    if user is None or user.organization_id != current_user.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+
+    user.full_name = payload.full_name
     await db.commit()
     return _to_read(await _load_member(db, user.id))
 

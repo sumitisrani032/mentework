@@ -60,6 +60,30 @@ export async function grantRole(
 }
 
 /**
+ * Correct someone's name.
+ *
+ * The name only — the address is what they sign in with, so it is not editable
+ * on their behalf.
+ */
+export async function renameMember(
+  userId: number,
+  fullName: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const response = await fetch(`/api/users/${userId}/profile`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ full_name: fullName }),
+  });
+  if (response.ok) return { ok: true };
+
+  const payload = await response.json().catch(() => null);
+  return {
+    ok: false,
+    error: describeError(payload) ?? `Could not save the name (${response.status}).`,
+  };
+}
+
+/**
  * Take someone out of the workspace, or put them back.
  *
  * Deactivation, not deletion: their access ends everywhere while the time they

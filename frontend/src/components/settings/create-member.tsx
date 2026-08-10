@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { buttonClass } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { createMember } from "@/lib/members";
 import type { Role } from "@/lib/rbac";
 import type { Project } from "@/lib/timesheets";
@@ -76,26 +77,22 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
     router.refresh();
   }
 
-  if (!open) {
-    return (
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={() => setOpen(true)} className={buttonClass("primary", "sm")}>
-          Add person
-        </button>
-        {created ? (
-          <span className="text-sm text-primary">
-            {created} can sign in now. Pass on the password you set.
-          </span>
-        ) : null}
-      </div>
-    );
-  }
-
   return (
-    <form method="post" onSubmit={submit} className="w-full rounded-xl border border-border bg-surface p-5">
-      <h2 className="font-medium">Add someone to this workspace</h2>
+    <div className="flex flex-wrap items-center gap-3">
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass("primary", "sm")}>
+        Add person
+      </button>
+      {created ? (
+        <span className="text-sm text-primary">
+          {created} can sign in now. Pass on the password you set.
+        </span>
+      ) : null}
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      {/* Mounted only while open, so a cancelled attempt leaves nothing behind. */}
+      {open ? (
+        <Dialog open onClose={close} title="Add someone to this workspace">
+          <form method="post" onSubmit={submit}>
+      <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-medium">
           Full name
           <input
@@ -201,8 +198,8 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
         </p>
       ) : null}
 
-      <div className="mt-4 flex gap-2">
-        <button type="button" onClick={close} className={buttonClass("ghost", "sm")}>
+      <div className="mt-6 flex items-center justify-end gap-3 border-t border-border pt-5">
+        <button type="button" onClick={close} className={buttonClass("ghost", "md")}>
           Cancel
         </button>
         <button
@@ -213,11 +210,14 @@ export function CreateMember({ roles, projects }: { roles: Role[]; projects: Pro
             password.length < MIN_PASSWORD ||
             (needsProject && projectIds.length === 0)
           }
-          className={buttonClass("primary", "sm")}
+          className={buttonClass("primary", "md")}
         >
           {pending ? "Creating…" : "Create person"}
         </button>
       </div>
-    </form>
+          </form>
+        </Dialog>
+      ) : null}
+    </div>
   );
 }

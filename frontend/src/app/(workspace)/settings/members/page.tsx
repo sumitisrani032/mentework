@@ -117,7 +117,6 @@ export default async function MembersPage() {
                       canEditAccess={canAssignRoles && roles.length > 0}
                       canRemovePeople={canRemovePeople}
                       isSelf={member.id === session.user.id}
-                      columns={showActions ? 4 : 3}
                     />
                   ))}
                 </tbody>

@@ -43,6 +43,24 @@ class MemberCreate(BaseModel):
         return cleaned
 
 
+class MemberProfileUpdate(BaseModel):
+    """Correct someone's name on their behalf.
+
+    Only the name. The address is what they sign in with, and changing it for
+    them is how someone loses their own account.
+    """
+
+    full_name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("full_name")
+    @classmethod
+    def not_only_spaces(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("cannot be blank")
+        return cleaned
+
+
 class MemberUpdate(BaseModel):
     """Take someone out of the workspace, or put them back.
 

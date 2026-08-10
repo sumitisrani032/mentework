@@ -13,9 +13,13 @@ import { useEffect, useRef } from "react";
 // preflight zeroes along with every other margin — leaving the panel in the
 // top-left corner. m-auto hands the centring back. The height cap keeps a tall
 // form scrollable rather than clipped once it is anchored to the middle.
+// text-left because a dialog inherits from wherever it happens to sit in the
+// DOM — opened from a right-aligned table cell, every heading inside it came
+// out right-aligned. Its own alignment is not the caller's business.
 const PANEL_CLASS =
   "m-auto max-h-[calc(100dvh-4rem)] w-[min(48rem,calc(100vw-2rem))] overflow-y-auto rounded-xl " +
-  "border border-border bg-background p-0 text-foreground backdrop:bg-black/50 open:animate-none";
+  "border border-border bg-background p-0 text-left text-foreground backdrop:bg-black/50 " +
+  "open:animate-none";
 
 export function Dialog({
   open,
