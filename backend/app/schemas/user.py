@@ -62,6 +62,9 @@ class MemberRoleRead(BaseModel):
     role: str
     scope: RoleScope
     project: str | None
+    # The project's public id, so the name can be a link to it and so the
+    # picker can tell which projects a grant already covers.
+    project_id: uuid.UUID | None
 
 
 class MemberRead(BaseModel):

@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { AssignRole } from "@/components/settings/assign-role";
 import { CreateMember } from "@/components/settings/create-member";
-import { MemberAccess } from "@/components/settings/member-access";
-import { RoleChip } from "@/components/settings/role-chip";
+import { MemberRow } from "@/components/settings/member-row";
 import { Container } from "@/components/ui/section";
 import { fetchMembers } from "@/lib/members-server";
 import { fetchRoleMatrix } from "@/lib/roles-server";
@@ -53,6 +51,7 @@ export default async function MembersPage() {
   ]);
 
   const roles = matrix?.status === "ok" ? matrix.matrix.roles : [];
+  const showActions = (canAssignRoles && roles.length > 0) || canRemovePeople;
 
   return (
     <main className="flex-1">
@@ -101,7 +100,7 @@ export default async function MembersPage() {
                     <th scope="col" className="px-4 py-3 text-left font-semibold">
                       Roles
                     </th>
-                    {(canAssignRoles && roles.length > 0) || canRemovePeople ? (
+                    {showActions ? (
                       <th scope="col" className="px-4 py-3 text-right font-semibold">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -110,48 +109,16 @@ export default async function MembersPage() {
                 </thead>
                 <tbody>
                   {members.map((member) => (
-                    <tr
+                    <MemberRow
                       key={member.id}
-                      className={`border-b border-border last:border-b-0 ${
-                        member.is_active ? "" : "text-muted"
-                      }`}
-                    >
-                      <th scope="row" className="px-4 py-2.5 text-left align-top font-medium">
-                        {member.full_name}
-                        {member.is_active ? null : (
-                          <span className="ml-2 text-xs text-muted">deactivated</span>
-                        )}
-                      </th>
-                      <td className="px-4 py-2.5 align-top text-muted">{member.email}</td>
-                      <td className="px-4 py-2.5 align-top">
-                        {member.roles.length === 0 ? (
-                          <span className="text-muted">No role yet</span>
-                        ) : (
-                          <span className="flex flex-wrap items-start gap-1.5">
-                            {member.roles.map((grant) => (
-                              <RoleChip
-                                key={grant.id}
-                                member={member}
-                                grant={grant}
-                                removable={canAssignRoles}
-                              />
-                            ))}
-                          </span>
-                        )}
-                      </td>
-                      {(canAssignRoles && roles.length > 0) || canRemovePeople ? (
-                        <td className="px-4 py-2.5 text-right align-top">
-                          <span className="inline-flex items-start justify-end gap-2">
-                            {canAssignRoles && roles.length > 0 && member.is_active ? (
-                              <AssignRole member={member} roles={roles} projects={projects} />
-                            ) : null}
-                            {canRemovePeople ? (
-                              <MemberAccess member={member} isSelf={member.id === session.user.id} />
-                            ) : null}
-                          </span>
-                        </td>
-                      ) : null}
-                    </tr>
+                      member={member}
+                      roles={roles}
+                      projects={projects}
+                      canEditAccess={canAssignRoles && roles.length > 0}
+                      canRemovePeople={canRemovePeople}
+                      isSelf={member.id === session.user.id}
+                      columns={showActions ? 4 : 3}
+                    />
                   ))}
                 </tbody>
               </table>

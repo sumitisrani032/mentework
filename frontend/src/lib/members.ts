@@ -6,6 +6,8 @@ export type MemberRole = {
   role: string;
   scope: "organization" | "project";
   project: string | null;
+  /** The project's public id. Null for an organisation-wide grant. */
+  project_id: string | null;
 };
 
 export type Member = {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -46,7 +47,23 @@ export function RoleChip({
     <span className="inline-flex flex-col gap-1">
       <span className="inline-flex items-center gap-1 rounded-full border border-border py-0.5 pr-1 pl-2 text-xs">
         {grant.role}
-        {grant.project ? <span className="text-muted">· {grant.project}</span> : null}
+        {grant.project ? (
+          <span className="text-muted">
+            ·{" "}
+            {grant.project_id ? (
+              // The grant is about a project, so say which one and go there.
+              <Link
+                href={`/projects/${grant.project_id}/time`}
+                title={`Open ${grant.project}`}
+                className="underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+              >
+                {grant.project}
+              </Link>
+            ) : (
+              grant.project
+            )}
+          </span>
+        ) : null}
 
         {removable ? (
           confirming ? (
