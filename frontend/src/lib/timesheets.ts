@@ -144,6 +144,40 @@ export function formatDate(isoDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/**
+ * A day as a heading: "8 July".
+ *
+ * The exception to DD/MM/YYYY, and deliberately so. A heading is read, not
+ * compared: "8 July" says what it is at a glance where 08/07 has to be decoded.
+ * The year is dropped because a timesheet is a month of work and repeating
+ * 2026 down the page tells nobody anything.
+ *
+ * Day-first and spelled in English rather than through toLocaleDateString,
+ * which would put the month first for a US reader and break step with every
+ * other date here.
+ */
+export function formatDayHeading(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const name = MONTH_NAMES[month - 1];
+  if (!name || !day || !year) return isoDate;
+  return `${day} ${name}`;
+}
+
 /** Group entries under their date, newest first, preserving order within a day. */
 export function groupByDate(entries: TimeEntry[]): { date: string; entries: TimeEntry[] }[] {
   const byDate = new Map<string, TimeEntry[]>();

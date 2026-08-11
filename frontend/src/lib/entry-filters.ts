@@ -1,4 +1,4 @@
-import { type TimeEntry, formatDate } from "@/lib/timesheets";
+import { type TimeEntry, formatDate, formatDayHeading } from "@/lib/timesheets";
 
 export type StatusFilter = "all" | TimeEntry["status"];
 export type GroupBy = "date" | "person";
@@ -102,7 +102,7 @@ export function groupEntries(entries: TimeEntry[], filters: EntryFilters): Entry
     const label =
       filters.groupBy === "person"
         ? (entry.logged_by?.full_name ?? "Unknown")
-        : formatDate(entry.date);
+        : formatDayHeading(entry.date);
 
     const group = groups.get(key);
     if (group) group.entries.push(entry);

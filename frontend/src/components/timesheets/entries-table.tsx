@@ -139,19 +139,19 @@ export function EntriesTable({
           {groupEntries(entries, filters).map((day) => (
             <tbody key={day.key}>
               <tr className="border-b border-border bg-surface/60">
-                <th
-                  scope="colgroup"
-                  colSpan={4}
-                  className="px-4 py-2 text-left text-xs font-semibold tracking-wide uppercase"
-                >
+                <th scope="colgroup" className="px-4 py-2 text-left text-sm font-semibold">
                   {day.label}
                 </th>
-                <td className="px-4 py-2 text-right text-xs text-muted">
+                {/* In the Time column, not off at the right edge: a total
+                    belongs above the numbers it adds up, where the eye can run
+                    straight down the column and check it. */}
+                <td className="px-4 py-2 text-sm font-semibold whitespace-nowrap">
                   {formatDuration(
                     totalDuration(day.entries).hours,
                     totalDuration(day.entries).mins,
                   )}
                 </td>
+                <td colSpan={3} />
               </tr>
               {day.entries.map((entry) => {
               const mine = entry.by_me;
@@ -256,8 +256,18 @@ function ReadRow({
           </span>
         ) : null}
       </td>
-      <td className="px-4 py-2.5">
-        {entry.description ?? <span className="text-muted">—</span>}
+      {/* max-w-0 with w-full is what makes truncate work in a table: without a
+          resolved width the cell grows to fit the text instead of clipping it. */}
+      <td className="w-full max-w-0 px-4 py-2.5">
+        {entry.description ? (
+          // One line on the listing. The whole note is on the entry itself, and
+          // a wall of text here pushes the hours and the status off the row.
+          <span className="block truncate" title={entry.description}>
+            {entry.description}
+          </span>
+        ) : (
+          <span className="text-muted">—</span>
+        )}
       </td>
       <td className={`px-4 py-2.5 whitespace-nowrap ${STATUS_CLASS[entry.status]}`}>
         {STATUS_LABEL[entry.status]}
