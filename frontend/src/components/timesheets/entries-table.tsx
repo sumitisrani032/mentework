@@ -139,19 +139,13 @@ export function EntriesTable({
           {groupEntries(entries, filters).map((day) => (
             <tbody key={day.key}>
               <tr className="border-b border-border bg-surface/60">
-                <th scope="colgroup" className="px-4 py-2 text-left text-sm font-semibold">
+                <th
+                  scope="colgroup"
+                  colSpan={5}
+                  className="px-4 py-2 text-left text-sm font-semibold"
+                >
                   {day.label}
                 </th>
-                {/* In the Time column, not off at the right edge: a total
-                    belongs above the numbers it adds up, where the eye can run
-                    straight down the column and check it. */}
-                <td className="px-4 py-2 text-sm font-semibold whitespace-nowrap">
-                  {formatDuration(
-                    totalDuration(day.entries).hours,
-                    totalDuration(day.entries).mins,
-                  )}
-                </td>
-                <td colSpan={3} />
               </tr>
               {day.entries.map((entry) => {
               const mine = entry.by_me;
@@ -190,6 +184,20 @@ export function EntriesTable({
                 />
                 );
               })}
+
+              {/* The day's total closes its block, under the hours it adds up
+                  — a sum belongs at the foot of the column it sums, after the
+                  rows rather than before them. */}
+              <tr className="border-b border-border">
+                <td className="px-4 py-2 text-right text-xs text-muted">Total</td>
+                <td className="px-4 py-2 text-sm font-semibold whitespace-nowrap">
+                  {formatDuration(
+                    totalDuration(day.entries).hours,
+                    totalDuration(day.entries).mins,
+                  )}
+                </td>
+                <td colSpan={3} />
+              </tr>
             </tbody>
           ))}
         </table>
