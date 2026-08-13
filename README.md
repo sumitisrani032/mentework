@@ -87,6 +87,18 @@ Edit the matrix at `/settings/roles`. Definitions live in
 
 ## Getting started
 
+With Docker, and nothing else installed:
+
+```bash
+cp .env.example .env
+docker compose up
+```
+
+That starts PostgreSQL, applies the migrations, seeds a demo workspace the
+first time, and serves both apps with hot reload.
+
+Or run the toolchain yourself:
+
 ```bash
 cp .env.example .env                  # database + API settings
 cp frontend/.env.example frontend/.env.local   # web settings
@@ -96,6 +108,9 @@ npm run setup:api # create backend/.venv and install Python dependencies
 npm run db:up     # start PostgreSQL
 npm run dev       # run web and api together
 ```
+
+Either way, sign in at http://acme.localhost:3000/login as `ada@acme.test` /
+`mentework`. Full detail in [docs/local-setup.md](docs/local-setup.md).
 
 - Web: http://localhost:3000
 - API: http://localhost:8000 (interactive docs at `/docs`)

@@ -1,9 +1,65 @@
 # Local setup
 
-From nothing to a signed-in workspace. Takes about five minutes, most of it
-waiting on installs.
+Two ways in. **Docker** needs nothing but Docker and gets you a signed-in
+workspace in one command. **Manual** installs the toolchain on your machine,
+which is what you want if you are going to be editing all day and want your
+editor's language server pointed at the same environment.
 
-## Prerequisites
+## With Docker
+
+```bash
+git clone <repo> && cd Mentework
+cp .env.example .env
+docker compose up
+```
+
+That is the whole thing. Compose starts PostgreSQL, waits for it to be ready,
+applies the migrations, seeds a demo workspace **the first time only**, and
+serves the API and the web app with hot reload. No Node, no Python, no uv.
+
+Then open **<http://acme.localhost:3000/login>** and sign in as
+`ada@acme.test` / `mentework`. See [Demo accounts](demo-accounts.md) for the
+rest.
+
+| | |
+| --- | --- |
+| Web | <http://localhost:3000> — use `acme.localhost:3000` to sign in |
+| API | <http://localhost:8000> — docs at `/docs` |
+| PostgreSQL | `localhost:5433` |
+
+Source is bind-mounted, so editing a file reloads the service that owns it.
+
+### Everyday Docker commands
+
+| Command | What it does |
+| --- | --- |
+| `docker compose up` | Start everything, following the logs |
+| `docker compose up -d` | Same, in the background |
+| `docker compose down` | Stop it, keeping the database |
+| `docker compose down -v` | Stop it and **delete the database** |
+| `docker compose logs -f api` | Follow one service |
+| `docker compose exec api pytest` | Run the backend tests |
+| `docker compose exec api python -m scripts.seed_demo` | Re-seed, replacing the demo tenant |
+| `docker compose build` | Rebuild after changing a dependency |
+
+Dependencies are installed **into the images**, so adding a package to
+`pyproject.toml` or `package.json` needs a `docker compose build` — editing
+source alone does not.
+
+### Seeding, and what it will not do
+
+The first start seeds because the database is empty. Every start after that
+prints `N organization(s) already here — leaving the database alone` and
+changes nothing. `scripts/seed_demo` deletes the demo tenant before recreating
+it, which is right when you ask for it and wrong on every container start.
+
+To deliberately start over: `docker compose down -v && docker compose up`.
+
+## Manually
+
+Use this if you would rather run the toolchain directly.
+
+### Prerequisites
 
 | Tool | Version | Why |
 | --- | --- | --- |
@@ -12,7 +68,7 @@ waiting on installs.
 | [uv](https://github.com/astral-sh/uv) | recent | Creates the Python environment |
 | Docker + Compose | recent | Runs PostgreSQL 16 |
 
-## The whole thing, in order
+### The whole thing, in order
 
 ```bash
 git clone <repo> && cd Mentework
@@ -98,6 +154,14 @@ error.
 
 **Migrations or tests cannot reach the database.** `npm run db:up` first, then
 confirm with `pg_isready -h localhost -p 5433`.
+
+**Docker: a dependency you added is missing.** Packages are installed into the
+images, not the bind mount. `docker compose build` after changing
+`pyproject.toml` or `package.json`.
+
+**Docker: port already allocated.** Something is already on 3000, 8000 or 5433
+— often a manual `npm run dev` from the other setup path. Stop it, or stop the
+containers.
 
 **A page 404s after pulling changes.** The Next dev server caches compiled
 routes in `.next`. Restart it. Running `npm run build` while `next dev` is

@@ -1,0 +1,26 @@
+# Anything the build does not need, or that would overwrite what it installs.
+node_modules
+**/node_modules
+.next
+**/.next
+.venv
+**/.venv
+__pycache__
+**/__pycache__
+*.pyc
+
+.git
+.github
+docs
+
+# Local configuration and secrets. The container is given its own.
+.env
+.env.*
+!.env.example
+
+# Build and test leftovers.
+.pytest_cache
+**/.pytest_cache
+*.egg-info
+**/*.egg-info
+coverage

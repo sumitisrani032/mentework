@@ -1,3 +1,12 @@
+# The whole workspace, for local development.
+#
+#   docker compose up
+#
+# brings up PostgreSQL, applies the migrations, seeds a demo workspace the
+# first time, and serves the API and the web app with hot reload. Nothing else
+# has to be installed — no Node, no Python, no uv.
+#
+# Sign in at http://acme.localhost:3000/login as ada@acme.test / mentework.
 services:
   postgres:
     image: postgres:16-alpine
@@ -8,7 +17,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mentework}
       POSTGRES_DB: ${POSTGRES_DB:-mentework}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Published for psql and for running the app outside Docker. Containers
+      # reach it as postgres:5432 regardless of what this is set to.
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +27,59 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  api:
+    build:
+      context: ./backend
+    container_name: mentework-api
+    restart: unless-stopped
+    environment:
+      # Inside the network the database is a hostname on the default port. Set
+      # here rather than in .env, and environment beats .env in pydantic-settings,
+      # so a host-shaped URL in .env cannot reach in and break the container.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mentework}:${POSTGRES_PASSWORD:-mentework}@postgres:5432/${POSTGRES_DB:-mentework}
+      ENVIRONMENT: development
+      CORS_ORIGINS: http://localhost:3000,http://acme.localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      # The source, so a save reloads. Dependencies live in the image's own
+      # site-packages, which this mount cannot shadow.
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  web:
+    build:
+      # The root, because the lockfile and the workspace definition are there.
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: mentework-web
+    restart: unless-stopped
+    environment:
+      # Server-side only: the browser calls this app's own /api routes, and
+      # this app calls the API. Inside the network that is a hostname.
+      NEXT_PUBLIC_API_URL: http://api:8000
+      NEXT_PUBLIC_ROOT_DOMAIN: localhost
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      # Anonymous volumes keep the installed packages: without these, the mount
+      # above would hide them behind the host's directories.
+      - /app/node_modules
+      - /app/frontend/node_modules
+      - /app/frontend/.next
+    depends_on:
+      api:
+        condition: service_started
 
 volumes:
   postgres-data:
